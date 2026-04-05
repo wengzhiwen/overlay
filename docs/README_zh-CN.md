@@ -1,0 +1,111 @@
+# 运动数据 Overlay 视频生成器
+
+**[English](../README.md)** | **[日本語](README_ja.md)** | **简体中文**
+
+如果使用 Garmin 的手表、码表或是将运动数据上传到 Strava 之后，就可以下载到 GPX 或是 TCX 这样的运动数据文件。
+
+本项目可以将带有GPS、心率、海拔等信息的 GPX 或 TCX 数据文件转化成一个带有这些数据仪表的透明的视频（overlay视频）。有了这个视频，你就可以在视频编辑软件（Premiere、Resolve、Final Cut…几乎任何编辑软件）中将数据仪表和你的运动视频整合到一起。
+
+这是一个超轻量级的解决方案，不再需要付费购买甚至订阅任何软件，也不用再去下载一个只为了做这件事但超级不好用的软件。
+
+## Requirements
+
+- Node.js >= 20
+- npm >= 10
+- ffmpeg
+
+## Setup
+
+```bash
+npm install
+```
+
+## Available Scripts
+
+```bash
+npm run build
+npm run typecheck
+npm run lint
+npm run test
+npm run dev -- --help
+```
+
+## Usage
+
+开发态运行：
+
+```bash
+npm run dev -- --help
+```
+
+渲染示例：
+
+```bash
+npm run dev -- render \
+  --input path/to/a/tcx gpx/file.tcx \
+  --config examples/sample-config.json \
+  --sample
+```
+
+当前示例配置会输出一个不超过 30 秒、1920x1080、30fps 的透明 `overlay.mov`。
+
+如果想要完整运行，可以去掉 `--sample`：
+
+## Output Structure
+
+一次渲染的输出目录大致如下：
+
+```text
+output/demo-run/
+├─ source/
+│  ├─ activity_22292952339.tcx
+│  └─ sample-config.json
+├─ debug/
+│  ├─ activity.normalized.json
+│  └─ frame-data.json
+├─ logs/
+│  ├─ 01-load-config.log
+│  ├─ 02-load-activity.log
+│  ├─ ...
+│  └─ 11-postprocess.log
+├─ metadata.json
+└─ overlay.mov
+```
+如果你只是使用的话，只要找到 `overlay.mov` 就好了。
+
+## Config Notes
+
+配置文件目前支持：
+
+- 输出分辨率、帧率、时长策略
+- 输出格式：`mov` 或 `png-sequence`
+- 时间同步参数：offset / trim
+- 五个基础 widget：
+  - `speed`
+  - `heart-rate`
+  - `elevation`
+  - `distance`
+  - `time`
+- 全局 theme 和每个 widget 的位置、尺寸、基础样式
+
+可直接参考 [examples/sample-config.json](../examples/sample-config.json)。
+
+我是一个没有审美能力的人，欢迎大家提供你们的widget的PR给我。
+
+## Current Scope
+
+已实现：
+
+- `GPX` / `TCX` 输入
+- 配置加载与 Zod 校验
+- 活动归一化、插值、平滑、逐帧数据生成
+- Remotion 渲染五个基础 widget
+- 透明 `MOV / ProRes 4444` 导出
+- 日志、调试产物、元数据输出
+
+未来目标：
+
+- 更好看的 widgt，虽然这可能是我最不擅长的事情
+- 地图小窗
+- 功率与踏频 widget
+- 一个线上的 demo，让大家可以更容易的get到这个项目到底在做什么

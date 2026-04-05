@@ -47,12 +47,13 @@
 
 ## 7. Documentation
 
-- The `README.md` must include:
-  - project purpose
-  - setup instructions
-  - usage instructions
-  - coding and debugging instructions
-- When behavior, commands, configuration, or workflow changes, update documentation in the same task when appropriate.
+- README 采用多语言结构：
+  - `README.md`（根目录）— 英文主版本
+  - `docs/README_zh-CN.md` — 简体中文版本
+  - `docs/README_ja.md` — 日文版本
+  - 每个文件顶部包含三语切换链接，互相指向
+- `docs/` 目录同时用于存放示例视频、截图等未来素材
+- README 的更新由用户决定。不要因为修改了代码功能而自动联动修改 README，除非用户明确要求。
 - Keep design documents and implementation behavior aligned as the project evolves.
 
 ## 8. Git And Commit Messages
