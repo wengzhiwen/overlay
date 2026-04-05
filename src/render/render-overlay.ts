@@ -32,6 +32,7 @@ export type RenderOverlayRequest = {
   configPath: string;
   outputPath?: string | undefined;
   maxDurationMs?: number | undefined;
+  concurrency?: number | undefined;
   onProgress?: ((message: string) => void) | undefined;
 };
 
@@ -236,6 +237,7 @@ const renderMov = async (
   },
   targetFilePath: string,
   logger: StepLogger,
+  concurrency?: number | undefined,
 ): Promise<void> => {
   let lastLoggedProgressBucket = -1;
   const totalSeconds = composition.durationInFrames / composition.fps;
@@ -257,6 +259,7 @@ const renderMov = async (
     overwrite: true,
     muted: true,
     logLevel: "error",
+    concurrency: concurrency ?? null,
     onProgress: (progress) => {
       const bucket = Math.floor(progress.progress * 20);
 
@@ -284,6 +287,7 @@ const renderPngSequence = async (
   },
   outputDirectoryPath: string,
   logger: StepLogger,
+  concurrency?: number | undefined,
 ): Promise<void> => {
   let renderedFrames = 0;
   const renderStartTime = Date.now();
@@ -295,6 +299,7 @@ const renderPngSequence = async (
     outputDir: outputDirectoryPath,
     imageFormat: "png",
     logLevel: "error",
+    concurrency: concurrency ?? null,
     onStart: ({ frameCount }) => {
       const totalSeconds = composition.durationInFrames / composition.fps;
       logger.info(
@@ -483,12 +488,13 @@ export const renderOverlay = async (
           inputProps,
           framesDirectoryPath,
           logger,
+          request.concurrency,
         );
         return framesDirectoryPath;
       }
 
       const movFilePath = path.join(outputPath, "overlay.mov");
-      await renderMov(serveUrl, composition, inputProps, movFilePath, logger);
+      await renderMov(serveUrl, composition, inputProps, movFilePath, logger, request.concurrency);
       return movFilePath;
     },
   );
