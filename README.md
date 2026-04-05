@@ -52,6 +52,18 @@ npm run dev -- render \
 
 当前示例配置会输出一个 12 秒、1920x1080、30fps 的透明 `overlay.mov`，方便快速验证整条链路。
 
+如果只是快速预览布局而不想渲染整段活动，可以加上 `--sample`：
+
+```bash
+npm run dev -- render \
+  --input ref_input/activity_22292952339.tcx \
+  --config examples/sample-config-vertical-1080p.json \
+  --output output/preview-run \
+  --sample
+```
+
+`--sample` 会把最终输出时长限制到最多 30 秒，但不会修改你的配置文件。
+
 ## Output Structure
 
 一次渲染的输出目录大致如下：
