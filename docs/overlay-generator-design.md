@@ -463,8 +463,7 @@ type OverlayConfig = {
 - `enabled`
 - `x`
 - `y`
-- `width`
-- `height`
+- `scale`（画布宽度百分比，0.01–1）
 
 通用样式建议：
 
@@ -476,13 +475,14 @@ type OverlayConfig = {
 - `borderColor`
 - `borderWidth`
 - `borderRadius`
-- `padding`
 - `opacity`
 
 说明：
 
-- 当前阶段先用绝对坐标布局，降低实现复杂度
-- 组件大小由配置直接给出，不引入自动布局系统
+- 组件位置由 `x`、`y` 绝对坐标指定
+- 组件尺寸由 `scale`（百分比）+ 按组件类型固定的宽高比自动推导
+- 推导公式：`width = canvasWidth × scale`，`height = width / aspectRatio`，`padding = width × 0.07`
+- 用户不能自由设置 `width`、`height`、`padding`，由系统从 `scale` 统一计算
 
 ## 13. Remotion 层设计
 

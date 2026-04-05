@@ -33,8 +33,7 @@
       "enabled": true,
       "x": 60,
       "y": 80,
-      "width": 360,
-      "height": 220
+      "scale": 0.333
     },
     {
       "id": "heart-rate-top-right",
@@ -42,9 +41,10 @@
       "enabled": true,
       "x": 660,
       "y": 80,
-      "width": 360,
-      "height": 220,
-      "colorByZone": true
+      "scale": 0.333,
+      "colorByZone": true,
+      "showChart": "auto",
+      "chartRange": "medium"
     },
     {
       "id": "distance-bottom-right",
@@ -52,8 +52,7 @@
       "enabled": true,
       "x": 720,
       "y": 1540,
-      "width": 300,
-      "height": 130,
+      "scale": 0.278,
       "valueFontSize": 34,
       "labelFontSize": 16,
       "unitFontSize": 16
@@ -64,8 +63,7 @@
       "enabled": true,
       "x": 720,
       "y": 1690,
-      "width": 300,
-      "height": 130,
+      "scale": 0.278,
       "mode": "both",
       "timezone": "Asia/Singapore",
       "valueFontSize": 34,

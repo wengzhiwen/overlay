@@ -42,6 +42,8 @@ const getCompositionProps = (): RemotionInputProps => {
             clockTimeIso: undefined,
           },
         ],
+        heartRateZones: [],
+        activityDurationMs: 0,
       },
   };
 };

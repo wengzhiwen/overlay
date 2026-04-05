@@ -1,5 +1,7 @@
 import type { WidgetConfig } from "../../config/schema.js";
-import { WidgetShell, type BaseWidgetProps } from "./WidgetShell.js";
+import type { BaseWidgetProps } from "./WidgetShell.js";
+import { WidgetShell } from "./WidgetShell.js";
+import { HeartRateChart } from "./HeartRateChart.js";
 
 type HeartRateWidgetConfig = Extract<WidgetConfig, { type: "heart-rate" }>;
 
@@ -30,8 +32,22 @@ const getZoneColor = (
   return matchingZone?.color;
 };
 
+const shouldShowChart = (
+  config: HeartRateWidgetConfig,
+  totalDurationMs: number,
+): boolean => {
+  if (config.showChart === true) return true;
+  if (config.showChart === false) return false;
+  // "auto": show chart if total duration > 60s
+  return totalDurationMs > 60_000;
+};
+
+// Chart occupies ~35% of usable widget height
+const CHART_HEIGHT_RATIO = 0.35;
+
 export const HeartRateWidget = ({
   frame,
+  frameData,
   config,
   theme,
 }: BaseWidgetProps<HeartRateWidgetConfig>) => {
@@ -40,6 +56,24 @@ export const HeartRateWidget = ({
       ? "--"
       : Math.round(frame.metrics.heartRateBpm).toString();
 
+  const showChart = shouldShowChart(config, frameData.activityDurationMs);
+  const usableHeight = config.height - config.padding * 2;
+  const chartHeightPx = Math.round(usableHeight * CHART_HEIGHT_RATIO);
+
+  const chartElement = showChart
+    ? (
+        <HeartRateChart
+          frameData={frameData}
+          currentElapsedMs={frame.elapsedMs}
+          chartRange={config.chartRange}
+          chartWidthPx={config.width - config.padding * 2}
+          chartHeightPx={chartHeightPx}
+          sourceZones={frameData.heartRateZones}
+          configZones={config.zones}
+        />
+      )
+    : undefined;
+
   return (
     <WidgetShell
       config={config}
@@ -47,7 +81,7 @@ export const HeartRateWidget = ({
       theme={theme}
       value={heartRateValue}
       unit={config.showUnit ? "bpm" : undefined}
-      secondary={undefined}
+      secondary={chartElement}
       valueColor={getZoneColor(frame.metrics.heartRateBpm, config)}
     />
   );

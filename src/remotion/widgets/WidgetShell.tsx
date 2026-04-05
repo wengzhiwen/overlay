@@ -1,11 +1,12 @@
 import type { CSSProperties, ReactNode } from "react";
 
 import type { WidgetConfig } from "../../config/schema.js";
-import type { FrameSnapshot } from "../../domain/frame-data.js";
+import type { FrameData, FrameSnapshot } from "../../domain/frame-data.js";
 import type { OverlayTheme } from "../theme/default.js";
 
 export type BaseWidgetProps<TConfig extends WidgetConfig> = {
   frame: FrameSnapshot;
+  frameData: FrameData;
   config: TConfig;
   theme: OverlayTheme;
 };
@@ -16,7 +17,7 @@ type WidgetShellProps = {
   label: string | undefined;
   value: string;
   unit: string | undefined;
-  secondary: string | undefined;
+  secondary: ReactNode | undefined;
   valueColor: string | undefined;
 };
 

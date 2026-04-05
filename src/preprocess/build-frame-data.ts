@@ -154,5 +154,7 @@ export const buildFrameData = async (
     fps: config.render.fps,
     durationInFrames,
     frames,
+    heartRateZones: activity.zones.heartRate,
+    activityDurationMs: activity.summary.durationMs ?? 0,
   };
 };

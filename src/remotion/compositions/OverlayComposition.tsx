@@ -27,17 +27,19 @@ const renderWidget = (
     return null;
   }
 
+  const baseProps = { frame, frameData, theme };
+
   switch (widget.type) {
     case "speed":
-      return <SpeedWidget key={widget.id} frame={frame} config={widget} theme={theme} />;
+      return <SpeedWidget key={widget.id} {...baseProps} config={widget} />;
     case "heart-rate":
-      return <HeartRateWidget key={widget.id} frame={frame} config={widget} theme={theme} />;
+      return <HeartRateWidget key={widget.id} {...baseProps} config={widget} />;
     case "elevation":
-      return <ElevationWidget key={widget.id} frame={frame} config={widget} theme={theme} />;
+      return <ElevationWidget key={widget.id} {...baseProps} config={widget} />;
     case "distance":
-      return <DistanceWidget key={widget.id} frame={frame} config={widget} theme={theme} />;
+      return <DistanceWidget key={widget.id} {...baseProps} config={widget} />;
     case "time":
-      return <TimeWidget key={widget.id} frame={frame} config={widget} theme={theme} />;
+      return <TimeWidget key={widget.id} {...baseProps} config={widget} />;
     default:
       return null;
   }

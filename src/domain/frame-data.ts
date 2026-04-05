@@ -1,4 +1,5 @@
 import type { ActivityMetrics } from "./metrics.js";
+import type { ActivityZone } from "./activity.js";
 
 export type FrameSnapshot = {
   frame: number;
@@ -21,4 +22,6 @@ export type FrameData = {
   fps: number;
   durationInFrames: number;
   frames: FrameSnapshot[];
+  heartRateZones: ActivityZone[];
+  activityDurationMs: number;
 };

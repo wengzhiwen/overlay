@@ -23,10 +23,8 @@ const BaseWidgetSchema = z.object({
   enabled: z.boolean().default(true),
   x: nonNegativeNumber.default(0),
   y: nonNegativeNumber.default(0),
-  width: positiveNumber.default(320),
-  height: positiveNumber.default(120),
+  scale: z.number().finite().min(0.01).max(1).default(0.15),
   opacity: z.number().finite().min(0).max(1).default(1),
-  padding: nonNegativeNumber.default(20),
   backgroundColor: z.string().default("rgba(10, 18, 24, 0.55)"),
   borderColor: z.string().default("rgba(255, 255, 255, 0.2)"),
   borderWidth: nonNegativeNumber.default(1),
@@ -53,6 +51,8 @@ const HeartRateWidgetSchema = BaseWidgetSchema.extend({
   showUnit: z.boolean().default(true),
   colorByZone: z.boolean().default(false),
   zones: z.array(ZoneSchema).default([]),
+  showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
+  chartRange: z.enum(["short", "medium", "long"]).default("medium"),
 });
 
 const ElevationWidgetSchema = BaseWidgetSchema.extend({
@@ -85,94 +85,127 @@ export const WidgetConfigSchema = z.discriminatedUnion("type", [
   TimeWidgetSchema,
 ]);
 
-export const OverlayConfigSchema = z.object({
-  render: z.object({
-    width: positiveNumber.default(1920),
-    height: positiveNumber.default(1080),
-    fps: positiveNumber.default(30),
-    durationStrategy: z.enum(["activity", "fixed", "trimmed"]).default("activity"),
-    durationMs: positiveNumber.optional(),
-    output: z
-      .object({
-        format: OutputFormatSchema.default("mov"),
-        codec: z.literal("prores").default("prores"),
-        proresProfile: z.enum(["4444", "4444-xq"]).default("4444"),
-      })
-      .default({
-        format: "mov",
-        codec: "prores",
-        proresProfile: "4444",
-      }),
-  }),
-  sync: z
-    .object({
-      activityOffsetMs: z.number().finite().default(0),
-      trimStartMs: nonNegativeNumber.default(0),
-      trimEndMs: nonNegativeNumber.default(0),
-      timezone: z.string().optional(),
-    })
-    .default({
-      activityOffsetMs: 0,
-      trimStartMs: 0,
-      trimEndMs: 0,
-    }),
-  preprocess: z
-    .object({
-      interpolateMissingSamples: z.boolean().default(true),
-      speedSmoothingSeconds: z.number().int().min(1).max(15).default(3),
-      heartRateSmoothingSeconds: z.number().int().min(1).max(15).default(3),
-      altitudeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
-      gradeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
-    })
-    .default({
-      interpolateMissingSamples: true,
-      speedSmoothingSeconds: 3,
-      heartRateSmoothingSeconds: 3,
-      altitudeSmoothingSeconds: 5,
-      gradeSmoothingSeconds: 5,
-    }),
-  theme: z
-    .object({
-      fontFamily: z.string().default("SF Pro Display, Helvetica, Arial, sans-serif"),
-      colors: z
+// Per-widget-type aspect ratios (width / height)
+const WIDGET_ASPECT_RATIOS: Record<string, number> = {
+  speed: 5 / 3,
+  "heart-rate": 7 / 6,
+  elevation: 5 / 3,
+  distance: 5 / 3,
+  time: 2,
+};
+
+const WIDGET_PADDING_RATIO = 0.07;
+
+const resolveWidgetDimensions = (
+  widget: z.infer<typeof WidgetConfigSchema>,
+  canvasWidth: number,
+) => {
+  const width = Math.round(canvasWidth * widget.scale);
+  const height = Math.round(width / (WIDGET_ASPECT_RATIOS[widget.type] ?? 5 / 3));
+  const padding = Math.max(8, Math.round(width * WIDGET_PADDING_RATIO));
+
+  return { ...widget, width, height, padding };
+};
+
+export const OverlayConfigSchema = z
+  .object({
+    render: z.object({
+      width: positiveNumber.default(1920),
+      height: positiveNumber.default(1080),
+      fps: positiveNumber.default(30),
+      durationStrategy: z
+        .enum(["activity", "fixed", "trimmed"])
+        .default("activity"),
+      durationMs: positiveNumber.optional(),
+      output: z
         .object({
-          primary: z.string().default("#ffffff"),
-          secondary: z.string().default("#cbd5e1"),
-          accent: z.string().default("#34d399"),
-          text: z.string().default("#ffffff"),
-          muted: z.string().default("#94a3b8"),
+          format: OutputFormatSchema.default("mov"),
+          codec: z.literal("prores").default("prores"),
+          proresProfile: z.enum(["4444", "4444-xq"]).default("4444"),
         })
         .default({
+          format: "mov",
+          codec: "prores",
+          proresProfile: "4444",
+        }),
+    }),
+    sync: z
+      .object({
+        activityOffsetMs: z.number().finite().default(0),
+        trimStartMs: nonNegativeNumber.default(0),
+        trimEndMs: nonNegativeNumber.default(0),
+        timezone: z.string().optional(),
+      })
+      .default({
+        activityOffsetMs: 0,
+        trimStartMs: 0,
+        trimEndMs: 0,
+      }),
+    preprocess: z
+      .object({
+        interpolateMissingSamples: z.boolean().default(true),
+        speedSmoothingSeconds: z.number().int().min(1).max(15).default(3),
+        heartRateSmoothingSeconds: z.number().int().min(1).max(15).default(3),
+        altitudeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
+        gradeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
+      })
+      .default({
+        interpolateMissingSamples: true,
+        speedSmoothingSeconds: 3,
+        heartRateSmoothingSeconds: 3,
+        altitudeSmoothingSeconds: 5,
+        gradeSmoothingSeconds: 5,
+      }),
+    theme: z
+      .object({
+        fontFamily: z
+          .string()
+          .default("SF Pro Display, Helvetica, Arial, sans-serif"),
+        colors: z
+          .object({
+            primary: z.string().default("#ffffff"),
+            secondary: z.string().default("#cbd5e1"),
+            accent: z.string().default("#34d399"),
+            text: z.string().default("#ffffff"),
+            muted: z.string().default("#94a3b8"),
+          })
+          .default({
+            primary: "#ffffff",
+            secondary: "#cbd5e1",
+            accent: "#34d399",
+            text: "#ffffff",
+            muted: "#94a3b8",
+          }),
+      })
+      .default({
+        fontFamily: "SF Pro Display, Helvetica, Arial, sans-serif",
+        colors: {
           primary: "#ffffff",
           secondary: "#cbd5e1",
           accent: "#34d399",
           text: "#ffffff",
           muted: "#94a3b8",
-        }),
-    })
-    .default({
-      fontFamily: "SF Pro Display, Helvetica, Arial, sans-serif",
-      colors: {
-        primary: "#ffffff",
-        secondary: "#cbd5e1",
-        accent: "#34d399",
-        text: "#ffffff",
-        muted: "#94a3b8",
-      },
-    }),
-  widgets: z.array(WidgetConfigSchema).default([]),
-  debug: z
-    .object({
-      dumpFrameData: z.boolean().default(true),
-      dumpNormalizedActivity: z.boolean().default(true),
-    })
-    .default({
-      dumpFrameData: true,
-      dumpNormalizedActivity: true,
-    }),
-});
+        },
+      }),
+    widgets: z.array(WidgetConfigSchema).default([]),
+    debug: z
+      .object({
+        dumpFrameData: z.boolean().default(true),
+        dumpNormalizedActivity: z.boolean().default(true),
+      })
+      .default({
+        dumpFrameData: true,
+        dumpNormalizedActivity: true,
+      }),
+  })
+  .transform((data) => ({
+    ...data,
+    widgets: data.widgets.map((w) =>
+      resolveWidgetDimensions(w, data.render.width),
+    ),
+  }));
 
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
 export type WidgetType = z.infer<typeof WidgetTypeSchema>;
-export type WidgetConfig = z.infer<typeof WidgetConfigSchema>;
 export type OverlayConfig = z.infer<typeof OverlayConfigSchema>;
+export type WidgetConfig = OverlayConfig["widgets"][number];

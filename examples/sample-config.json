@@ -33,8 +33,7 @@
       "enabled": true,
       "x": 80,
       "y": 760,
-      "width": 280,
-      "height": 170
+      "scale": 0.146
     },
     {
       "id": "hr-main",
@@ -42,9 +41,10 @@
       "enabled": true,
       "x": 390,
       "y": 760,
-      "width": 280,
-      "height": 170,
-      "colorByZone": true
+      "scale": 0.146,
+      "colorByZone": true,
+      "showChart": "auto",
+      "chartRange": "medium"
     },
     {
       "id": "elev-main",
@@ -52,8 +52,7 @@
       "enabled": true,
       "x": 700,
       "y": 760,
-      "width": 280,
-      "height": 170,
+      "scale": 0.146,
       "showAscent": true
     },
     {
@@ -62,8 +61,7 @@
       "enabled": true,
       "x": 1010,
       "y": 760,
-      "width": 280,
-      "height": 170
+      "scale": 0.146
     },
     {
       "id": "time-main",
@@ -71,8 +69,7 @@
       "enabled": true,
       "x": 1320,
       "y": 760,
-      "width": 360,
-      "height": 170,
+      "scale": 0.188,
       "mode": "both",
       "timezone": "Asia/Singapore"
     }

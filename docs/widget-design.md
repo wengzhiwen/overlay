@@ -23,6 +23,7 @@ MVP 组件层需要满足以下目标：
 ```ts
 type BaseWidgetProps<TConfig> = {
   frame: FrameSnapshot;
+  frameData: FrameData;
   config: TConfig;
   theme: OverlayTheme;
 };
@@ -62,10 +63,8 @@ type BaseWidgetConfig = {
   enabled: boolean;
   x: number;
   y: number;
-  width: number;
-  height: number;
+  scale: number; // 画布宽度百分比，0.01–1
   opacity?: number;
-  padding?: number;
   backgroundColor?: string;
   borderColor?: string;
   borderWidth?: number;
@@ -84,7 +83,21 @@ type BaseWidgetConfig = {
 说明：
 
 - 所有组件都使用绝对定位
-- `width` 和 `height` 由配置显式给定
+- `scale` 表示组件宽度占画布宽度的百分比（0.01–1），组件高度和内边距由宽高比和比例系数自动推导
+- 宽高比按组件类型固定：
+
+| Widget     | 宽高比 (w:h) |
+|------------|-------------|
+| speed      | 5:3         |
+| heart-rate | 7:6         |
+| elevation  | 5:3         |
+| distance   | 5:3         |
+| time       | 2:1         |
+
+- 推导公式：
+  - `width = round(canvasWidth × scale)`
+  - `height = round(width / aspectRatio)`
+  - `padding = max(8, round(width × 0.07))`
 - 样式字段允许覆盖全局 `theme`
 
 ## 4. 通用视觉结构
@@ -186,11 +199,18 @@ type HeartRateWidgetConfig = BaseWidgetConfig & {
     max?: number;
     color: string;
   }>;
+  showChart?: "auto" | boolean;
+  chartRange?: "short" | "medium" | "long";
 };
 ```
 
 - 如果源文件中有zone信息，`colorByZone`配置有效
-- zone color有默认也可以单独配置 
+- zone color有默认也可以单独配置
+- `showChart`：`"auto"`（默认）表示活动时长 > 60s 时自动显示心率图表；`true` 始终显示；`false` 始终隐藏
+- `chartRange`：图表 X 轴时间范围，`"short"` = 60s，`"medium"` = 300s（默认），`"long"` = 1200s
+- 图表模式下在 BPM 数值下方显示柱状图，每秒一根柱子，按 zone 着色
+- 柱状图 Y 轴默认 60–140 BPM，随数据动态扩展
+- 图表组件内所有尺寸按 widget 实际尺寸同比缩放
 
 ## 8. ElevationWidget
 
