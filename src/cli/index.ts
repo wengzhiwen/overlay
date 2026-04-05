@@ -39,8 +39,7 @@ const main = async (): Promise<void> => {
     .requiredOption("-c, --config <path>", "Path to a JSON or YAML config file.")
     .option(
       "-o, --output <path>",
-      "Output directory for generated artifacts.",
-      "output",
+      "Output directory for generated artifacts. Defaults to output/<timestamp>.",
     )
     .option(
       "--sample",
@@ -51,7 +50,7 @@ const main = async (): Promise<void> => {
       async (options: {
         input: string;
         config: string;
-        output: string;
+        output?: string;
         sample: boolean;
       }) => {
         process.exitCode = await runRenderCommand(options);
