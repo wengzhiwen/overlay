@@ -1,0 +1,41 @@
+{
+  "name": "overlay",
+  "version": "0.1.0",
+  "description": "Create overlay video by GPX or TCX file for sports vlogs.",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "overlay": "./dist/cli/index.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "dev": "tsx src/cli/index.ts",
+    "lint": "eslint .",
+    "start": "node dist/cli/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "keywords": [
+    "overlay",
+    "gpx",
+    "tcx",
+    "sports",
+    "cli",
+    "typescript"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^25.5.2",
+    "eslint": "^10.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0"
+  },
+  "dependencies": {
+    "commander": "^14.0.3"
+  }
+}
