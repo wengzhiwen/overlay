@@ -85,8 +85,15 @@ const getEffectiveDurationMs = (
 export const buildFrameData = async (
   activity: Activity,
   config: OverlayConfig,
+  options?: {
+    maxDurationMs?: number | undefined;
+  },
 ): Promise<FrameData> => {
-  const durationMs = getEffectiveDurationMs(activity, config);
+  const baseDurationMs = getEffectiveDurationMs(activity, config);
+  const durationMs =
+    options?.maxDurationMs === undefined
+      ? baseDurationMs
+      : Math.min(baseDurationMs, options.maxDurationMs);
   const durationInFrames = Math.max(
     1,
     Math.ceil((durationMs / 1000) * config.render.fps),

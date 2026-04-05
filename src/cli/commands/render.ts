@@ -8,6 +8,7 @@ export type RenderCommandOptions = {
   input: string;
   config: string;
   output?: string;
+  sample?: boolean;
 };
 
 const ensureReadableFile = async (
@@ -35,11 +36,18 @@ export const runRenderCommand = async (
   console.log(`Input file: ${inputPath}`);
   console.log(`Config file: ${configPath}`);
   console.log(`Output target: ${outputPath ?? resolveProjectPath("output")}`);
+  console.log(
+    `Sample mode: ${options.sample ? "enabled (max 30 seconds)" : "disabled"}`,
+  );
 
   const result = await renderOverlay({
     inputPath,
     configPath,
     outputPath,
+    maxDurationMs: options.sample ? 30_000 : undefined,
+    onProgress: (message) => {
+      console.log(message);
+    },
   });
 
   console.log(result.message);

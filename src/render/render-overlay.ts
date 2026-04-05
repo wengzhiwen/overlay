@@ -1,5 +1,6 @@
 import path from "node:path";
 import { execFile } from "node:child_process";
+import { createWriteStream } from "node:fs";
 import { promisify } from "node:util";
 
 import { bundle } from "@remotion/bundler";
@@ -24,13 +25,14 @@ import {
   createTimestampedOutputDirectory,
   ensureDirectoryPath,
   writeJsonFile,
-  writeTextFile,
 } from "../utils/files.js";
 
 export type RenderOverlayRequest = {
   inputPath: string;
   configPath: string;
   outputPath?: string | undefined;
+  maxDurationMs?: number | undefined;
+  onProgress?: ((message: string) => void) | undefined;
 };
 
 export type RenderOverlayResult = {
@@ -53,6 +55,7 @@ type RenderMetadata = {
     fps: number;
     durationInFrames: number;
     outputFormat: string;
+    sampleMaxDurationMs: number | undefined;
   };
   activity: {
     startedAt: string | undefined;
@@ -71,40 +74,74 @@ type StepLogger = {
 
 const execFileAsync = promisify(execFile);
 
-const createStepLogger = (lines: string[]): StepLogger => {
+const createStepLogger = (
+  filePath: string,
+  emitProgress: (message: string) => void,
+): {
+  logger: StepLogger;
+  close: () => Promise<void>;
+} => {
+  const stream = createWriteStream(filePath, { flags: "a" });
+
   const push = (level: "INFO" | "WARN" | "ERROR", message: string) => {
-    lines.push(`[${new Date().toISOString()}] [${level}] ${message}`);
+    const line = `[${new Date().toISOString()}] [${level}] ${message}`;
+    stream.write(`${line}\n`);
+    emitProgress(line);
   };
 
   return {
-    info: (message) => push("INFO", message),
-    warn: (message) => push("WARN", message),
-    error: (message) => push("ERROR", message),
+    logger: {
+      info: (message) => push("INFO", message),
+      warn: (message) => push("WARN", message),
+      error: (message) => push("ERROR", message),
+    },
+    close: async () => {
+      await new Promise<void>((resolve, reject) => {
+        stream.end((error?: Error | null) => {
+          if (error) {
+            reject(error);
+            return;
+          }
+
+          resolve();
+        });
+      });
+    },
   };
 };
 
 const runLoggedStep = async <T>(
   fileName: string,
   logsDirectoryPath: string,
+  onProgress: (message: string) => void,
   callback: (logger: StepLogger) => Promise<T>,
 ): Promise<T> => {
-  const lines: string[] = [];
-  const logger = createStepLogger(lines);
+  const stepLabel = fileName.replace(/\.log$/, "");
+  const emitProgress = (line: string) => {
+    onProgress(`[${stepLabel}] ${line}`);
+  };
+  const { logger, close } = createStepLogger(
+    path.join(logsDirectoryPath, fileName),
+    emitProgress,
+  );
   const startedAt = new Date();
 
   logger.info(`Step started: ${fileName}`);
 
   try {
     const result = await callback(logger);
-    logger.info(`Step finished successfully in ${Date.now() - startedAt.getTime()}ms`);
-    await writeTextFile(path.join(logsDirectoryPath, fileName), `${lines.join("\n")}\n`);
+    logger.info(
+      `Step finished successfully in ${Date.now() - startedAt.getTime()}ms`,
+    );
+    await close();
 
     return result;
   } catch (error) {
-    const message = error instanceof Error ? error.stack ?? error.message : String(error);
+    const message =
+      error instanceof Error ? error.stack ?? error.message : String(error);
     logger.error(message);
     logger.info(`Step failed after ${Date.now() - startedAt.getTime()}ms`);
-    await writeTextFile(path.join(logsDirectoryPath, fileName), `${lines.join("\n")}\n`);
+    await close();
     throw error;
   }
 };
@@ -130,11 +167,18 @@ const bundleRemotionProject = async (logger: StepLogger): Promise<string> => {
   return bundle({
     entryPoint: path.resolve(process.cwd(), "dist/remotion/index.js"),
     onProgress: (progress) => {
-      const bucket = Math.floor(progress * 10);
+      const progressPercent = progress > 1 ? progress : progress * 100;
+      const normalizedProgressPercent = Math.max(
+        0,
+        Math.min(100, progressPercent),
+      );
+      const bucket = Math.floor(normalizedProgressPercent / 10);
 
       if (bucket !== lastProgressBucket) {
         lastProgressBucket = bucket;
-        logger.info(`Bundle progress: ${Math.round(progress * 100)}%`);
+        logger.info(
+          `Bundle progress: ${Math.round(normalizedProgressPercent)}%`,
+        );
       }
     },
   });
@@ -182,6 +226,11 @@ const renderMov = async (
   logger: StepLogger,
 ): Promise<void> => {
   let lastLoggedProgressBucket = -1;
+  const totalSeconds = composition.durationInFrames / composition.fps;
+
+  logger.info(
+    `Rendering MOV output. Total duration: ${totalSeconds.toFixed(1)}s (${composition.durationInFrames} frames at ${composition.fps}fps).`,
+  );
 
   await renderMedia({
     serveUrl,
@@ -200,8 +249,9 @@ const renderMov = async (
 
       if (bucket !== lastLoggedProgressBucket) {
         lastLoggedProgressBucket = bucket;
+        const renderedSeconds = progress.renderedFrames / composition.fps;
         logger.info(
-          `Render progress: ${Math.round(progress.progress * 100)}% (${progress.renderedFrames}/${composition.durationInFrames} frames)`,
+          `Render progress: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${composition.durationInFrames} | video ${renderedSeconds.toFixed(1)}s/${totalSeconds.toFixed(1)}s | stage ${progress.stitchStage}`,
         );
       }
     },
@@ -228,12 +278,17 @@ const renderPngSequence = async (
     imageFormat: "png",
     logLevel: "error",
     onStart: ({ frameCount }) => {
-      logger.info(`Rendering ${frameCount} frame(s) as PNG sequence.`);
+      const totalSeconds = composition.durationInFrames / composition.fps;
+      logger.info(
+        `Rendering ${frameCount} frame(s) as PNG sequence. Total duration: ${totalSeconds.toFixed(1)}s.`,
+      );
     },
     onFrameUpdate: (framesRendered) => {
       if (framesRendered !== renderedFrames && framesRendered % 30 === 0) {
         renderedFrames = framesRendered;
-        logger.info(`Rendered ${framesRendered} frame(s).`);
+        logger.info(
+          `Render progress: frame ${framesRendered}/${composition.durationInFrames} | video ${(framesRendered / composition.fps).toFixed(1)}s/${(composition.durationInFrames / composition.fps).toFixed(1)}s`,
+        );
       }
     },
   });
@@ -242,6 +297,7 @@ const renderPngSequence = async (
 export const renderOverlay = async (
   request: RenderOverlayRequest,
 ): Promise<RenderOverlayResult> => {
+  const onProgress = request.onProgress ?? (() => undefined);
   const { runId, outputPath } = await resolveOutputDirectory(request.outputPath);
   const logsDirectoryPath = path.join(outputPath, "logs");
   const debugDirectoryPath = path.join(outputPath, "debug");
@@ -256,10 +312,16 @@ export const renderOverlay = async (
   const config = await runLoggedStep(
     "01-load-config.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info(`Loading config from ${request.configPath}`);
       const loadedConfig = await loadOverlayConfig(request.configPath);
       logger.info("Config loaded successfully.");
+      if (request.maxDurationMs !== undefined) {
+        logger.info(
+          `Sample mode is enabled. Output will be limited to at most ${(request.maxDurationMs / 1000).toFixed(0)} second(s).`,
+        );
+      }
       return loadedConfig;
     },
   );
@@ -267,6 +329,7 @@ export const renderOverlay = async (
   const rawActivity = await runLoggedStep(
     "02-load-activity.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info(`Loading activity from ${request.inputPath}`);
       const activity = await loadActivity(request.inputPath);
@@ -278,6 +341,7 @@ export const renderOverlay = async (
   const normalizedActivity = await runLoggedStep(
     "03-normalize-activity.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Normalizing activity samples.");
       const activity = await normalizeActivity(rawActivity);
@@ -289,6 +353,7 @@ export const renderOverlay = async (
   const derivedActivity = await runLoggedStep(
     "04-derive-metrics.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Deriving metrics.");
       const activity = await deriveMetrics(normalizedActivity);
@@ -300,6 +365,7 @@ export const renderOverlay = async (
   const processedActivity = await runLoggedStep(
     "05-interpolate-and-smooth.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Interpolating missing samples.");
       const interpolated = await interpolateActivity(derivedActivity, config);
@@ -313,10 +379,15 @@ export const renderOverlay = async (
   const frameData = await runLoggedStep(
     "06-build-frame-data.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Building frame data.");
-      const built = await buildFrameData(processedActivity, config);
-      logger.info(`Built ${built.frames.length} frame snapshot(s).`);
+      const built = await buildFrameData(processedActivity, config, {
+        maxDurationMs: request.maxDurationMs,
+      });
+      logger.info(
+        `Built ${built.frames.length} frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
+      );
       return built;
     },
   );
@@ -338,6 +409,7 @@ export const renderOverlay = async (
   await runLoggedStep(
     "07-build-project.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       await buildProjectForRender(logger);
     },
@@ -346,6 +418,7 @@ export const renderOverlay = async (
   const serveUrl = await runLoggedStep(
     "08-bundle-remotion.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Bundling Remotion project.");
       const bundledServeUrl = await bundleRemotionProject(logger);
@@ -362,10 +435,13 @@ export const renderOverlay = async (
   const composition = await runLoggedStep(
     "09-select-composition.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       logger.info("Selecting Remotion composition.");
       const selectedComposition = await selectOverlayComposition(serveUrl, inputProps);
-      logger.info("Composition selected successfully.");
+      logger.info(
+        `Composition selected successfully. Duration: ${(selectedComposition.durationInFrames / selectedComposition.fps).toFixed(1)}s (${selectedComposition.durationInFrames} frames).`,
+      );
       return selectedComposition;
     },
   );
@@ -373,6 +449,7 @@ export const renderOverlay = async (
   const finalOutputPath = await runLoggedStep(
     "10-render-overlay.log",
     logsDirectoryPath,
+    onProgress,
     async (logger) => {
       if (config.render.output.format === "png-sequence") {
         const framesDirectoryPath = path.join(outputPath, "frames");
@@ -393,9 +470,14 @@ export const renderOverlay = async (
     },
   );
 
-  await runLoggedStep("11-postprocess.log", logsDirectoryPath, async (logger) => {
-    logger.info("No additional post-processing was required.");
-  });
+  await runLoggedStep(
+    "11-postprocess.log",
+    logsDirectoryPath,
+    onProgress,
+    async (logger) => {
+      logger.info("No additional post-processing was required.");
+    },
+  );
 
   const metadata: RenderMetadata = {
     runId,
@@ -411,6 +493,7 @@ export const renderOverlay = async (
       fps: frameData.fps,
       durationInFrames: frameData.durationInFrames,
       outputFormat: config.render.output.format,
+      sampleMaxDurationMs: request.maxDurationMs,
     },
     activity: {
       startedAt: processedActivity.startedAt,

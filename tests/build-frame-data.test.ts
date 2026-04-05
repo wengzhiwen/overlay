@@ -83,4 +83,24 @@ describe("buildFrameData", () => {
     expect(frameData.frames[1]?.metrics.distanceM).toBe(5);
     expect(frameData.frames[1]?.clockTimeIso).toBe("2026-03-25T09:16:45.500Z");
   });
+
+  it("caps the render duration when sample mode is enabled", async () => {
+    const frameData = await buildFrameData(
+      activity,
+      {
+        ...defaultOverlayConfig,
+        render: {
+          ...defaultOverlayConfig.render,
+          fps: 2,
+          durationStrategy: "activity",
+        },
+      },
+      {
+        maxDurationMs: 1000,
+      },
+    );
+
+    expect(frameData.durationInFrames).toBe(2);
+    expect(frameData.frames.at(-1)?.elapsedMs).toBe(500);
+  });
 });

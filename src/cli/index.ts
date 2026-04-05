@@ -42,8 +42,18 @@ const main = async (): Promise<void> => {
       "Output directory for generated artifacts.",
       "output",
     )
+    .option(
+      "--sample",
+      "Limit the rendered output to at most 30 seconds for faster preview rendering.",
+      false,
+    )
     .action(
-      async (options: { input: string; config: string; output: string }) => {
+      async (options: {
+        input: string;
+        config: string;
+        output: string;
+        sample: boolean;
+      }) => {
         process.exitCode = await runRenderCommand(options);
       },
     );
