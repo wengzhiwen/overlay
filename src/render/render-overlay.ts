@@ -215,6 +215,18 @@ const selectOverlayComposition = async (
   });
 };
 
+const formatEta = (seconds: number): string => {
+  if (seconds < 60) return `${Math.ceil(seconds)}s`;
+  if (seconds < 3600) {
+    const m = Math.floor(seconds / 60);
+    const s = Math.ceil(seconds % 60);
+    return `${m}m ${String(s).padStart(2, "0")}s`;
+  }
+  const h = Math.floor(seconds / 3600);
+  const m = Math.ceil((seconds % 3600) / 60);
+  return `${h}h ${String(m).padStart(2, "0")}m`;
+};
+
 const renderMov = async (
   serveUrl: string,
   composition: Awaited<ReturnType<typeof selectComposition>>,
@@ -227,6 +239,7 @@ const renderMov = async (
 ): Promise<void> => {
   let lastLoggedProgressBucket = -1;
   const totalSeconds = composition.durationInFrames / composition.fps;
+  const renderStartTime = Date.now();
 
   logger.info(
     `Rendering MOV output. Total duration: ${totalSeconds.toFixed(1)}s (${composition.durationInFrames} frames at ${composition.fps}fps).`,
@@ -250,8 +263,12 @@ const renderMov = async (
       if (bucket !== lastLoggedProgressBucket) {
         lastLoggedProgressBucket = bucket;
         const renderedSeconds = progress.renderedFrames / composition.fps;
+        const elapsedMs = Date.now() - renderStartTime;
+        const eta = progress.progress > 0
+          ? formatEta((elapsedMs / progress.progress - elapsedMs) / 1000)
+          : "--";
         logger.info(
-          `Render progress: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${composition.durationInFrames} | video ${renderedSeconds.toFixed(1)}s/${totalSeconds.toFixed(1)}s | stage ${progress.stitchStage}`,
+          `Render progress: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${composition.durationInFrames} | video ${renderedSeconds.toFixed(1)}s/${totalSeconds.toFixed(1)}s | ETA ${eta} | stage ${progress.stitchStage}`,
         );
       }
     },
@@ -269,6 +286,7 @@ const renderPngSequence = async (
   logger: StepLogger,
 ): Promise<void> => {
   let renderedFrames = 0;
+  const renderStartTime = Date.now();
 
   await renderFrames({
     serveUrl,
@@ -286,8 +304,13 @@ const renderPngSequence = async (
     onFrameUpdate: (framesRendered) => {
       if (framesRendered !== renderedFrames && framesRendered % 30 === 0) {
         renderedFrames = framesRendered;
+        const progress = framesRendered / composition.durationInFrames;
+        const elapsedMs = Date.now() - renderStartTime;
+        const eta = progress > 0
+          ? formatEta((elapsedMs / progress - elapsedMs) / 1000)
+          : "--";
         logger.info(
-          `Render progress: frame ${framesRendered}/${composition.durationInFrames} | video ${(framesRendered / composition.fps).toFixed(1)}s/${(composition.durationInFrames / composition.fps).toFixed(1)}s`,
+          `Render progress: frame ${framesRendered}/${composition.durationInFrames} | video ${(framesRendered / composition.fps).toFixed(1)}s/${(composition.durationInFrames / composition.fps).toFixed(1)}s | ETA ${eta}`,
         );
       }
     },
