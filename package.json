@@ -16,6 +16,7 @@
     "dev": "tsx src/cli/index.ts",
     "lint": "eslint .",
     "start": "node dist/cli/index.js",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "keywords": [
@@ -30,12 +31,25 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.5.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "eslint": "^10.2.0",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.0"
+    "typescript-eslint": "^8.58.0",
+    "vitest": "^4.1.2"
   },
   "dependencies": {
-    "commander": "^14.0.3"
+    "@remotion/bundler": "^4.0.445",
+    "@remotion/renderer": "^4.0.445",
+    "@sports-alliance/sports-lib": "^11.0.2",
+    "@xmldom/xmldom": "^0.9.9",
+    "commander": "^14.0.3",
+    "fast-xml-parser": "^5.5.10",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "remotion": "^4.0.445",
+    "yaml": "^2.8.3",
+    "zod": "^4.3.6"
   }
 }

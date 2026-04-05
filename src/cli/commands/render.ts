@@ -2,7 +2,7 @@ import { access } from "node:fs/promises";
 import { constants } from "node:fs";
 
 import { renderOverlay } from "../../render/render-overlay.js";
-import { ensureDirectoryPath, resolveProjectPath } from "../../utils/files.js";
+import { resolveProjectPath } from "../../utils/files.js";
 
 export type RenderCommandOptions = {
   input: string;
@@ -24,9 +24,9 @@ export const runRenderCommand = async (
 ): Promise<number> => {
   const inputPath = resolveProjectPath(options.input);
   const configPath = resolveProjectPath(options.config);
-  const outputPath = await ensureDirectoryPath(
-    resolveProjectPath(options.output ?? "output"),
-  );
+  const outputPath = options.output
+    ? resolveProjectPath(options.output)
+    : undefined;
 
   await ensureReadableFile(inputPath, "Input");
   await ensureReadableFile(configPath, "Config");
@@ -34,7 +34,7 @@ export const runRenderCommand = async (
   console.log("Starting render command.");
   console.log(`Input file: ${inputPath}`);
   console.log(`Config file: ${configPath}`);
-  console.log(`Output directory: ${outputPath}`);
+  console.log(`Output target: ${outputPath ?? resolveProjectPath("output")}`);
 
   const result = await renderOverlay({
     inputPath,
@@ -43,6 +43,7 @@ export const runRenderCommand = async (
   });
 
   console.log(result.message);
+  console.log(`Run output directory: ${result.outputPath}`);
 
   return result.exitCode;
 };

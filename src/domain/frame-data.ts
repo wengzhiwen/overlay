@@ -3,15 +3,21 @@ import type { ActivityMetrics } from "./metrics.js";
 export type FrameSnapshot = {
   frame: number;
   elapsedMs: number;
+  renderTimeMs: number;
+  isActive: boolean;
   metrics: ActivityMetrics;
-  position?: {
+  position:
+    | {
     lat: number;
     lon: number;
-  };
-  clockTimeIso?: string;
+  }
+    | undefined;
+  clockTimeIso: string | undefined;
 };
 
 export type FrameData = {
+  width: number;
+  height: number;
   fps: number;
   durationInFrames: number;
   frames: FrameSnapshot[];

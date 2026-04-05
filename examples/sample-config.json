@@ -3,10 +3,83 @@
     "width": 1920,
     "height": 1080,
     "fps": 30,
-    "durationStrategy": "activity",
+    "durationStrategy": "fixed",
+    "durationMs": 12000,
     "output": {
-      "format": "mov"
+      "format": "mov",
+      "codec": "prores",
+      "proresProfile": "4444"
     }
   },
-  "widgets": []
+  "sync": {
+    "activityOffsetMs": 0,
+    "trimStartMs": 0,
+    "trimEndMs": 0,
+    "timezone": "Asia/Singapore"
+  },
+  "theme": {
+    "fontFamily": "SF Pro Display, Helvetica, Arial, sans-serif",
+    "colors": {
+      "primary": "#ffffff",
+      "secondary": "#cbd5e1",
+      "accent": "#34d399",
+      "text": "#ffffff",
+      "muted": "#94a3b8"
+    }
+  },
+  "widgets": [
+    {
+      "id": "speed-main",
+      "type": "speed",
+      "enabled": true,
+      "x": 80,
+      "y": 760,
+      "width": 280,
+      "height": 170
+    },
+    {
+      "id": "hr-main",
+      "type": "heart-rate",
+      "enabled": true,
+      "x": 390,
+      "y": 760,
+      "width": 280,
+      "height": 170,
+      "colorByZone": true
+    },
+    {
+      "id": "elev-main",
+      "type": "elevation",
+      "enabled": true,
+      "x": 700,
+      "y": 760,
+      "width": 280,
+      "height": 170,
+      "showAscent": true
+    },
+    {
+      "id": "distance-main",
+      "type": "distance",
+      "enabled": true,
+      "x": 1010,
+      "y": 760,
+      "width": 280,
+      "height": 170
+    },
+    {
+      "id": "time-main",
+      "type": "time",
+      "enabled": true,
+      "x": 1320,
+      "y": 760,
+      "width": 360,
+      "height": 170,
+      "mode": "both",
+      "timezone": "Asia/Singapore"
+    }
+  ],
+  "debug": {
+    "dumpFrameData": true,
+    "dumpNormalizedActivity": true
+  }
 }

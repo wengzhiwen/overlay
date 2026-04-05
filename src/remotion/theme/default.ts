@@ -19,3 +19,19 @@ export const defaultTheme: OverlayTheme = {
     muted: "#9ca3af",
   },
 };
+
+export const mergeThemeWithConfig = (
+  theme: OverlayTheme,
+  config: {
+    fontFamily?: string;
+    colors?: Partial<OverlayTheme["colors"]>;
+  },
+): OverlayTheme => {
+  return {
+    fontFamily: config.fontFamily ?? theme.fontFamily,
+    colors: {
+      ...theme.colors,
+      ...config.colors,
+    },
+  };
+};

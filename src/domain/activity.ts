@@ -1,17 +1,25 @@
 export type ActivitySourceFormat = "gpx" | "tcx";
 
+export type ActivityZone = {
+  min: number | undefined;
+  max: number | undefined;
+  color: string | undefined;
+  label: string | undefined;
+};
+
 export type ActivitySample = {
   timestampMs: number;
   elapsedMs: number;
-  lat?: number;
-  lon?: number;
-  altitudeM?: number;
-  distanceM?: number;
-  speedMps?: number;
-  heartRateBpm?: number;
-  gradePct?: number;
-  cadenceRpm?: number;
-  powerW?: number;
+  lat: number | undefined;
+  lon: number | undefined;
+  altitudeM: number | undefined;
+  distanceM: number | undefined;
+  speedMps: number | undefined;
+  heartRateBpm: number | undefined;
+  ascentM: number | undefined;
+  gradePct: number | undefined;
+  cadenceRpm: number | undefined;
+  powerW: number | undefined;
 };
 
 export type Activity = {
@@ -20,13 +28,17 @@ export type Activity = {
     filePath: string;
     format: ActivitySourceFormat;
   };
-  sportType?: "ride" | "run" | "unknown";
-  startedAt?: string;
-  timezone?: string;
+  sportType: "ride" | "run" | "unknown" | undefined;
+  startedAt: string | undefined;
+  timezone: string | undefined;
+  warnings: string[];
+  zones: {
+    heartRate: ActivityZone[];
+  };
   summary: {
-    durationMs?: number;
-    distanceM?: number;
-    ascentM?: number;
+    durationMs: number | undefined;
+    distanceM: number | undefined;
+    ascentM: number | undefined;
   };
   samples: ActivitySample[];
 };

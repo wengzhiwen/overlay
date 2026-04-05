@@ -1,10 +1,10 @@
 export type ActivityMetrics = {
-  speedMps?: number;
-  heartRateBpm?: number;
-  altitudeM?: number;
-  ascentM?: number;
-  distanceM?: number;
-  gradePct?: number;
-  cadenceRpm?: number;
-  powerW?: number;
+  speedMps: number | undefined;
+  heartRateBpm: number | undefined;
+  altitudeM: number | undefined;
+  ascentM: number | undefined;
+  distanceM: number | undefined;
+  gradePct: number | undefined;
+  cadenceRpm: number | undefined;
+  powerW: number | undefined;
 };

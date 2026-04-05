@@ -1,13 +1,14 @@
 # Overlay
 
-运动数据 Overlay 生成器的基础项目框架。
+运动数据 Overlay 生成器。
 
-当前阶段重点是把项目整理成一个可编译、可 lint、可执行最小 CLI 的 Node.js + TypeScript 工程，业务逻辑暂未实现。
+本项目输入 `GPX` 或 `TCX` 活动文件和一份 `JSON` / `YAML` 配置，输出一个带透明通道的 overlay 素材，供 Premiere、Resolve、Final Cut 等剪辑软件与原视频手动合成。当前 MVP 已实现基础的活动解析、预处理、五个基础 widget 渲染，以及透明 `MOV / ProRes 4444` 导出。
 
 ## Requirements
 
 - Node.js >= 20
 - npm >= 10
+- macOS / Linux with `ffmpeg`
 
 ## Setup
 
@@ -21,11 +22,11 @@ npm install
 npm run build
 npm run typecheck
 npm run lint
+npm run test
 npm run dev -- --help
-npm run dev -- render --input ref_input/activity_22292952339.tcx --config examples/sample-config.json
 ```
 
-## CLI Usage
+## Usage
 
 开发态运行：
 
@@ -40,19 +41,74 @@ npm run build
 npm run start -- --help
 ```
 
-最小 `render` 命令示例：
+渲染示例：
 
 ```bash
 npm run dev -- render \
   --input ref_input/activity_22292952339.tcx \
   --config examples/sample-config.json \
-  --output output/dev-run
+  --output output/demo-run
 ```
 
-说明：
+当前示例配置会输出一个 12 秒、1920x1080、30fps 的透明 `overlay.mov`，方便快速验证整条链路。
 
-- 当前 `render` 命令只做参数解析、基础路径检查和占位输出。
-- 实际的活动解析、预处理、Remotion 渲染和导出流程尚未实现。
+## Output Structure
+
+一次渲染的输出目录大致如下：
+
+```text
+output/demo-run/
+├─ source/
+│  ├─ activity_22292952339.tcx
+│  └─ sample-config.json
+├─ debug/
+│  ├─ activity.normalized.json
+│  └─ frame-data.json
+├─ logs/
+│  ├─ 01-load-config.log
+│  ├─ 02-load-activity.log
+│  ├─ ...
+│  └─ 11-postprocess.log
+├─ metadata.json
+└─ overlay.mov
+```
+
+## Config Notes
+
+配置文件目前支持：
+
+- 输出分辨率、帧率、时长策略
+- 输出格式：`mov` 或 `png-sequence`
+- 时间同步参数：offset / trim
+- 五个基础 widget：
+  - `speed`
+  - `heart-rate`
+  - `elevation`
+  - `distance`
+  - `time`
+- 全局 theme 和每个 widget 的位置、尺寸、基础样式
+
+可直接参考 [examples/sample-config.json](/Users/wengzhiwen/dev/overlay/examples/sample-config.json)。
+
+## Development And Debugging
+
+建议的日常开发流程：
+
+1. 修改代码后先运行 `npm run typecheck`
+2. 再运行 `npm run lint`
+3. 需要做功能回归时运行 `npm run test`
+4. 需要检查端到端渲染时运行 `npm run dev -- render ...`
+
+常见调试入口：
+
+- `ref_input/`
+  仅用于开发期调试和本地验证
+- `output/<run>/logs/`
+  每个处理阶段一个独立日志文件
+- `output/<run>/debug/activity.normalized.json`
+  标准化和预处理后的活动数据
+- `output/<run>/debug/frame-data.json`
+  Remotion 使用的逐帧数据
 
 ## Project Structure
 
@@ -70,6 +126,7 @@ npm run dev -- render \
 │  ├─ remotion/
 │  ├─ render/
 │  └─ utils/
+├─ tests/
 ├─ agent.md
 ├─ eslint.config.mjs
 ├─ package.json
@@ -77,25 +134,21 @@ npm run dev -- render \
 └─ README.md
 ```
 
-## Development Notes
+## Current Scope
 
-- `ref_input/` 下的文件仅用于开发和调试。
-- 所有代码注释使用英语。
-- 所有日志和 CLI 输出使用英语。
-- 每次编码完成后应运行 lint。
+已实现：
 
-## Debugging
+- `GPX` / `TCX` 输入
+- 配置加载与 Zod 校验
+- 活动归一化、插值、平滑、逐帧数据生成
+- Remotion 渲染五个基础 widget
+- 透明 `MOV / ProRes 4444` 导出
+- `PNG` 序列导出
+- 日志、调试产物、元数据输出
 
-基础调试流程：
+暂未实现：
 
-1. 使用 `npm run dev -- --help` 检查 CLI 入口是否正常。
-2. 使用 `npm run dev -- render ...` 验证参数解析和文件路径检查。
-3. 使用 `npm run build` 验证 TypeScript 构建产物。
-4. 使用 `npm run lint` 和 `npm run typecheck` 验证代码质量。
-
-## Next Steps
-
-- 接入配置文件解析与校验
-- 接入活动文件加载层
-- 接入预处理与逐帧数据构建
-- 接入 Remotion 渲染链路
+- 地图小窗
+- 功率与踏频 widget
+- GUI 编辑器
+- 自动与原视频做最终合成

@@ -34,7 +34,7 @@ const main = async (): Promise<void> => {
 
   program
     .command("render")
-    .description("Run the placeholder overlay render pipeline.")
+    .description("Render a transparent overlay video from an activity file.")
     .requiredOption("-i, --input <path>", "Path to a GPX or TCX activity file.")
     .requiredOption("-c, --config <path>", "Path to a JSON or YAML config file.")
     .option(
