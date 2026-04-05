@@ -4,7 +4,6 @@
     "height": 1080,
     "fps": 30,
     "durationStrategy": "fixed",
-    "durationMs": 12000,
     "output": {
       "format": "mov",
       "codec": "prores",
