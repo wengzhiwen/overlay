@@ -3,7 +3,7 @@
     "width": 1920,
     "height": 1080,
     "fps": 30,
-    "durationStrategy": "fixed",
+    "durationStrategy": "activity",
     "output": {
       "format": "mov",
       "codec": "prores",
