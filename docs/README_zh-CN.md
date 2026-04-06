@@ -57,7 +57,27 @@ npm run dev -- render \
 
 当前示例配置会输出一个不超过 30 秒、1920x1080、30fps 的透明 `overlay.mov`。
 
-如果想要完整运行，可以去掉 `--sample`：
+
+### CLI 选项
+
+| 选项 | 简写 | 说明 |
+|------|------|------|
+| `--input <path>` | `-i` | 活动文件路径（必选） |
+| `--config <path>` | `-c` | 配置文件路径（必选） |
+| `--output <path>` | `-o` | 输出目录（默认 `output/<timestamp>`） |
+| `--sample` | | 限制渲染最多 30 秒，用于快速预览 |
+| `--concurrency <value>` | | 并行渲染线程数。支持数字（如 `8`）或 CPU 线程数百分比（如 `75%`） |
+| `--segments <number>` | | 分段并行渲染数。每段至少 10 秒，需要 ffmpeg 用于拼接 |
+
+使用 `--segments` 可以显著加速长视频的渲染。例如将渲染分为 4 段并行处理：
+
+```bash
+npm run dev -- render \
+  -i path/to/activity.tcx \
+  -c examples/sample-config.json \
+  --segments 4 \
+  --concurrency 75%
+```
 
 ## Output Structure
 
@@ -109,6 +129,7 @@ output/demo-run/
 - 活动归一化、插值、平滑、逐帧数据生成
 - Remotion 渲染五个基础 widget
 - 透明 `MOV / ProRes 4444` 导出
+- `--sample` 快速预览、`--concurrency` 并行度控制、`--segments` 分段并行渲染
 - 日志、调试产物、元数据输出
 
 未来目标：

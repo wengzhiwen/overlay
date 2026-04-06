@@ -57,7 +57,27 @@ npm run dev -- render \
 
 サンプル設定では、最大30秒・1920x1080・30fpsの透明な `overlay.mov` が出力されます。
 
-フルレンダリングを行う場合は `--sample` を外してください。
+
+### CLI オプション
+
+| オプション | 短縮 | 説明 |
+|-----------|------|------|
+| `--input <path>` | `-i` | アクティビティファイルのパス（必須） |
+| `--config <path>` | `-c` | 設定ファイルのパス（必須） |
+| `--output <path>` | `-o` | 出力ディレクトリ（デフォルト: `output/<timestamp>`） |
+| `--sample` | | レンダリングを最大30秒に制限してプレビュー |
+| `--concurrency <value>` | | 並列レンダリングスレッド数。数値（例: `8`）またはCPUスレッド割合（例: `75%`）で指定 |
+| `--segments <number>` | | N分割して並列レンダリング。各セグメントは最低10秒。結合に ffmpeg が必要 |
+
+`--segments` を使用すると、長時間のアクティビティのレンダリングを大幅に高速化できます。例:
+
+```bash
+npm run dev -- render \
+  -i path/to/activity.tcx \
+  -c examples/sample-config.json \
+  --segments 4 \
+  --concurrency 75%
+```
 
 ## Output Structure
 
@@ -110,6 +130,7 @@ output/demo-run/
 - アクティビティの正規化、補間、スムージング、フレームデータ生成
 - Remotion による5つの基本ウィジェットのレンダリング
 - 透明 `MOV / ProRes 4444` エクスポート
+- `--sample` クイックプレビュー、`--concurrency` 並列制御、`--segments` 並列セグメントレンダリング
 - ログ、デバッグ成果物、メタデータ出力
 
 今後の予定：

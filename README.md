@@ -57,7 +57,27 @@ npm run dev -- render \
 
 The sample config produces a transparent `overlay.mov` capped at 30 seconds, 1920x1080, 30fps.
 
-Remove `--sample` for a full render.
+
+### CLI Options
+
+| Option | Shorthand | Description |
+|--------|-----------|-------------|
+| `--input <path>` | `-i` | Path to activity file (required) |
+| `--config <path>` | `-c` | Path to config file (required) |
+| `--output <path>` | `-o` | Output directory (default: `output/<timestamp>`) |
+| `--sample` | | Cap render to 30 seconds for quick preview |
+| `--concurrency <value>` | | Parallel render threads. Accepts a number (e.g. `8`) or CPU thread percentage (e.g. `75%`) |
+| `--segments <number>` | | Split render into N segments for parallel processing. Each segment must be at least 10 seconds. Requires ffmpeg for concatenation. |
+
+Use `--segments` to significantly speed up rendering for long activities. For example, splitting into 4 parallel segments:
+
+```bash
+npm run dev -- render \
+  -i path/to/activity.tcx \
+  -c examples/sample-config.json \
+  --segments 4 \
+  --concurrency 75%
+```
 
 ## Output Structure
 
@@ -110,6 +130,7 @@ Implemented:
 - Activity normalization, interpolation, smoothing, and per-frame data generation
 - Remotion rendering for five basic widgets
 - Transparent `MOV / ProRes 4444` export
+- `--sample` quick preview, `--concurrency` parallelism control, `--segments` parallel segmented rendering
 - Logging, debug artifacts, and metadata output
 
 Roadmap:
