@@ -11,6 +11,7 @@ export const WidgetTypeSchema = z.enum([
   "distance",
   "time",
   "noodlemap",
+  "citymap",
 ]);
 
 const ZoneSchema = z.object({
@@ -93,6 +94,14 @@ const NoodleMapWidgetSchema = BaseWidgetSchema.extend({
   lineWeight: z.enum(["S", "M", "L"]).default("M"),
 });
 
+const CityMapWidgetSchema = BaseWidgetSchema.extend({
+  type: z.literal("citymap"),
+  showLabel: z.boolean().default(false),
+  mapStyle: z.string().default("https://tiles.openfreemap.org/styles/liberty"),
+  lineColor: z.string().default("#34d399"),
+  lineWeight: z.enum(["S", "M", "L"]).default("M"),
+});
+
 export const WidgetConfigSchema = z.discriminatedUnion("type", [
   SpeedWidgetSchema,
   HeartRateWidgetSchema,
@@ -100,6 +109,7 @@ export const WidgetConfigSchema = z.discriminatedUnion("type", [
   DistanceWidgetSchema,
   TimeWidgetSchema,
   NoodleMapWidgetSchema,
+  CityMapWidgetSchema,
 ]);
 
 // Per-widget-type aspect ratios (width / height)
@@ -110,6 +120,7 @@ const WIDGET_ASPECT_RATIOS: Record<string, number> = {
   distance: 5 / 3,
   time: 2,
   noodlemap: 5 / 3,
+  citymap: 5 / 3,
 };
 
 const WIDGET_PADDING_RATIO = 0.07;

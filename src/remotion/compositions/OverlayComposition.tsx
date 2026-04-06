@@ -9,6 +9,7 @@ import {
 } from "../../domain/frame-data.js";
 import type { FrameDataMeta } from "../Root.js";
 import { defaultTheme, mergeThemeWithConfig } from "../theme/default.js";
+import { CityMapWidget } from "../widgets/CityMapWidget.js";
 import { DistanceWidget } from "../widgets/DistanceWidget.js";
 import { ElevationWidget } from "../widgets/ElevationWidget.js";
 import { HeartRateWidget } from "../widgets/HeartRateWidget.js";
@@ -41,6 +42,10 @@ const renderWidget = (
     return null;
   }
 
+  if (widget.type === "citymap" && !hasGpsTrack(frameData.frames)) {
+    return null;
+  }
+
   const isEmpty = frame?.isDataGap ?? false;
   const baseProps = { frame, frameData, theme, isEmpty };
 
@@ -57,6 +62,8 @@ const renderWidget = (
       return <TimeWidget key={widget.id} {...baseProps} config={widget} />;
     case "noodlemap":
       return <NoodleMapWidget key={widget.id} {...baseProps} config={widget} />;
+    case "citymap":
+      return <CityMapWidget key={widget.id} {...baseProps} config={widget} />;
     default:
       return null;
   }

@@ -72,6 +72,17 @@
       "lineWeight": "M"
     },
     {
+      "id": "citymap-bottom-left",
+      "type": "citymap",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 60,
+      "y": 1340,
+      "scale": 0.278,
+      "lineColor": "#34d399",
+      "lineWeight": "M"
+    },
+    {
       "id": "time-bottom-right",
       "type": "time",
       "enabled": true,

@@ -82,6 +82,16 @@
       "scale": 0.146,
       "lineColor": "#ffffff",
       "lineWeight": "M"
+    },
+    {
+      "id": "citymap-main",
+      "type": "citymap",
+      "enabled": false,
+      "x": 1560,
+      "y": 80,
+      "scale": 0.146,
+      "lineColor": "#34d399",
+      "lineWeight": "M"
     }
   ],
   "debug": {

@@ -462,6 +462,10 @@ const ffmpegConcat = async (
 
 const FRAME_DATA_FILENAME = "frame-data.json";
 
+const hasCityMapWidget = (config: OverlayConfig): boolean => {
+  return config.widgets.some((widget) => widget.type === "citymap");
+};
+
 type RenderInputProps = {
   frameDataMeta: FrameDataMeta;
   overlayConfig: OverlayConfig;
@@ -477,6 +481,7 @@ const renderMovSegmented = async (
   segments: number,
   proresProfile: OverlayConfig["render"]["output"]["proresProfile"],
   snapshotIntervalMs: number,
+  gl?: "angle" | undefined,
 ): Promise<void> => {
   const totalFrames = composition.durationInFrames;
   const ranges = calculateSegments(
@@ -499,6 +504,7 @@ const renderMovSegmented = async (
       concurrency,
       proresProfile,
       snapshotIntervalMs,
+      gl,
     );
     return;
   }
@@ -563,6 +569,7 @@ const renderMovSegmented = async (
             perSegmentConcurrency ?? undefined,
             snapshotIntervalMs,
             [startFrame, endFrame],
+            gl,
           );
           await runEncode(() =>
             encodePngSequenceToMov(
@@ -663,6 +670,7 @@ const renderMov = async (
   concurrency?: number | undefined,
   proresProfile: OverlayConfig["render"]["output"]["proresProfile"] = "4444",
   snapshotIntervalMs = SNAPSHOT_INTERVAL_MS,
+  gl?: "angle" | undefined,
 ): Promise<void> => {
   const tempFramesDirectoryPath = path.join(
     path.dirname(targetFilePath),
@@ -685,6 +693,8 @@ const renderMov = async (
       logger,
       concurrency,
       snapshotIntervalMs,
+      undefined,
+      gl,
     );
     await encodePngSequenceToMov(
       tempFramesDirectoryPath,
@@ -708,6 +718,7 @@ const renderPngSequence = async (
   concurrency?: number | undefined,
   snapshotIntervalMs = SNAPSHOT_INTERVAL_MS,
   frameRange?: FrameRange,
+  gl?: "angle" | undefined,
 ): Promise<void> => {
   let renderedFrames = 0;
   const renderStartTime = Date.now();
@@ -728,6 +739,7 @@ const renderPngSequence = async (
     concurrency: concurrency ?? null,
     frameRange: effectiveFrameRange,
     everyNthFrame,
+    ...(gl ? { chromiumOptions: { gl } } : {}),
     onStart: ({ frameCount }) => {
       const totalSeconds = (frameCount * snapshotIntervalMs) / 1000;
       const outputFps = 1000 / snapshotIntervalMs;
@@ -1011,11 +1023,15 @@ export const renderOverlay = async (
       },
     );
 
+    const gl = hasCityMapWidget(config) ? "angle" as const : undefined;
     const segmentFinalOutputPath = await runLoggedStep(
       `14-${String(segmentIndex).padStart(2, "0")}-render-overlay.log`,
       logsDirectoryPath,
       onProgress,
       async (logger) => {
+        if (gl) {
+          logger.info("City map widget detected — enabling GPU rendering (gl=angle).");
+        }
         if (config.render.output.format === "png-sequence") {
           const framesDirectoryPath = path.join(segmentOutputPath, "frames");
           await ensureDirectoryPath(framesDirectoryPath);
@@ -1027,6 +1043,8 @@ export const renderOverlay = async (
             logger,
             request.concurrency,
             frameData.snapshotIntervalMs,
+            undefined,
+            gl,
           );
           return framesDirectoryPath;
         }
@@ -1042,6 +1060,7 @@ export const renderOverlay = async (
             request.concurrency, requestedSegments,
             config.render.output.proresProfile,
             frameData.snapshotIntervalMs,
+            gl,
           );
         } else {
           await renderMov(
@@ -1053,6 +1072,7 @@ export const renderOverlay = async (
             request.concurrency,
             config.render.output.proresProfile,
             frameData.snapshotIntervalMs,
+            gl,
           );
         }
         return movFilePath;
