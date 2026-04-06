@@ -25,7 +25,7 @@ import {
   copyFileToDirectory,
   createTimestampedOutputDirectory,
   ensureDirectoryPath,
-  formatLocalTimestamp,
+  getLocalTimestampedOutputBaseName,
   writeJsonFile,
 } from "../utils/files.js";
 
@@ -884,37 +884,37 @@ export const renderOverlay = async (
       },
     );
 
-    const interpolatedActivity = await runLoggedStep(
-      `08-${String(segmentIndex).padStart(2, "0")}-interpolate.log`,
+    const gapFilledActivity = await runLoggedStep(
+      `08-${String(segmentIndex).padStart(2, "0")}-fill-gaps.log`,
       logsDirectoryPath,
       onProgress,
       async (logger) => {
-        logger.info("Interpolating missing samples.");
-        const activity = await interpolateActivity(derivedActivity, config);
+        logger.info("Expanding sparse samples to 1Hz and filling short gaps.");
+        const activity = fillShortGaps(derivedActivity, derivedActivity.gaps);
+        logger.info(`Filled activity has ${activity.samples.length} sample(s).`);
         return activity;
       },
     );
 
-    const smoothedActivity = await runLoggedStep(
-      `09-${String(segmentIndex).padStart(2, "0")}-smooth.log`,
+    const interpolatedActivity = await runLoggedStep(
+      `09-${String(segmentIndex).padStart(2, "0")}-interpolate.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Interpolating missing samples.");
+        const activity = await interpolateActivity(gapFilledActivity, config);
+        return activity;
+      },
+    );
+
+    const processedActivity = await runLoggedStep(
+      `10-${String(segmentIndex).padStart(2, "0")}-smooth.log`,
       logsDirectoryPath,
       onProgress,
       async (logger) => {
         logger.info("Applying smoothing.");
         const activity = await smoothActivity(interpolatedActivity, config);
         logger.info("Processed activity is ready.");
-        return activity;
-      },
-    );
-
-    const processedActivity = await runLoggedStep(
-      `10-${String(segmentIndex).padStart(2, "0")}-fill-gaps.log`,
-      logsDirectoryPath,
-      onProgress,
-      async (logger) => {
-        logger.info("Filling short gaps.");
-        const activity = fillShortGaps(smoothedActivity, smoothedActivity.gaps);
-        logger.info(`Filled activity has ${activity.samples.length} sample(s).`);
         return activity;
       },
     );
@@ -935,10 +935,9 @@ export const renderOverlay = async (
       },
     );
 
-    // Determine per-segment output directory using formatLocalTimestamp.
-    const segmentDirName = segment.startedAt
-      ? formatLocalTimestamp(new Date(segment.startedAt))
-      : formatLocalTimestamp(new Date());
+    const segmentOutputBaseName = getLocalTimestampedOutputBaseName(segment.startedAt);
+    // Determine per-segment output directory using the segment's first second in local time.
+    const segmentDirName = segmentOutputBaseName;
     const segmentOutputPath = activitySegments.length > 1
       ? path.join(outputPath, segmentDirName)
       : outputPath;
@@ -1030,7 +1029,10 @@ export const renderOverlay = async (
           return framesDirectoryPath;
         }
 
-        const movFilePath = path.join(segmentOutputPath, "overlay.mov");
+        const movFilePath = path.join(
+          segmentOutputPath,
+          `${segmentOutputBaseName}.mov`,
+        );
         const requestedSegments = request.segments ?? 1;
         if (requestedSegments > 1) {
           await renderMovSegmented(

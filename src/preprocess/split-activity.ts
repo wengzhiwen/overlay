@@ -4,33 +4,32 @@ const createSegment = (
   activity: Activity,
   samples: ActivitySample[],
   shortGaps: DataGap[],
+  sliceStart: number,
 ): Activity => {
   const firstSample = samples[0];
   const firstTimestampMs = firstSample?.timestampMs;
+  const firstElapsedMs = firstSample?.elapsedMs ?? 0;
   const startedAt =
     firstTimestampMs !== undefined
       ? new Date(firstTimestampMs).toISOString()
       : activity.startedAt;
 
-  // Reindex elapsedMs from 0
-  const reindexedSamples = samples.map((sample, index) => ({
+  const reindexedSamples = samples.map((sample) => ({
     ...sample,
-    elapsedMs: index * 1000,
+    elapsedMs: sample.elapsedMs - firstElapsedMs,
   }));
 
   const durationMs = reindexedSamples.length > 0
     ? reindexedSamples[reindexedSamples.length - 1]!.elapsedMs
     : 0;
 
-  // Remap short gap indices to the reindexed sample array
   const remappedShortGaps = shortGaps.map((gap) => {
-    const newAfterIndex = gap.afterIndex; // same relative position
-    const newBeforeIndex = gap.beforeIndex; // same relative position
-
     return {
       ...gap,
-      afterIndex: newAfterIndex,
-      beforeIndex: newBeforeIndex,
+      afterIndex: gap.afterIndex - sliceStart,
+      beforeIndex: gap.beforeIndex - sliceStart,
+      startMs: gap.startMs - firstElapsedMs,
+      endMs: gap.endMs - firstElapsedMs,
     };
   });
 
@@ -64,7 +63,7 @@ export const splitActivityAtLongGaps = (
       (sg) => sg.afterIndex >= sliceStart && sg.beforeIndex <= gap.afterIndex + 1,
     );
 
-    segments.push(createSegment(activity, segmentSamples, segmentShortGaps));
+    segments.push(createSegment(activity, segmentSamples, segmentShortGaps, sliceStart));
     sliceStart = gap.beforeIndex;
   }
 
@@ -74,7 +73,7 @@ export const splitActivityAtLongGaps = (
     (sg) => sg.afterIndex >= sliceStart,
   );
 
-  segments.push(createSegment(activity, lastSamples, lastShortGaps));
+  segments.push(createSegment(activity, lastSamples, lastShortGaps, sliceStart));
 
   return segments;
 };

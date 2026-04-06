@@ -20,6 +20,14 @@ type SportsActivity = {
     type: string;
     getData: (onlyNumeric?: boolean, filterInfinity?: boolean) => Array<number | null>;
   }>;
+  getStreamDataByDuration?: (
+    streamType: string,
+    filterNull?: boolean,
+    filterInfinity?: boolean,
+  ) => Array<{
+    time: number;
+    value: number | null;
+  }>;
 };
 
 type SportsEvent = {
@@ -88,6 +96,46 @@ const toOptionalNumberArray = (
   return values?.map((value) => (value === null ? undefined : value)) ?? [];
 };
 
+type TimedStreamSample = {
+  elapsedMs: number;
+  value: number | undefined;
+};
+
+const getTimedStreamData = (
+  activity: SportsActivity,
+  candidateNames: string[],
+): TimedStreamSample[] | undefined => {
+  if (activity.getStreamDataByDuration !== undefined) {
+    for (const candidateName of candidateNames) {
+      let timedData: Array<{ time: number; value: number | null }>;
+
+      try {
+        timedData = activity.getStreamDataByDuration(candidateName, true, false);
+      } catch {
+        continue;
+      }
+
+      if (timedData.length === 0) {
+        continue;
+      }
+
+      return timedData.map((sample) => ({
+        elapsedMs: sample.time,
+        value: sample.value === null ? undefined : sample.value,
+      }));
+    }
+  }
+
+  const streamData = toOptionalNumberArray(getStreamData(activity, candidateNames));
+
+  return streamData.length === 0
+    ? undefined
+    : streamData.map((value, index) => ({
+        elapsedMs: index * 1000,
+        value,
+      }));
+};
+
 const extractTimestamps = (
   content: string,
   format: ActivitySourceFormat,
@@ -129,63 +177,93 @@ const buildSamples = (
   startedAtMs: number | undefined,
   realTimestamps: number[],
 ): ActivitySample[] => {
-  const distanceData = toOptionalNumberArray(getStreamData(activity, ["Distance"]));
-  const cadenceData = toOptionalNumberArray(getStreamData(activity, ["Cadence"]));
-  const heartRateData = toOptionalNumberArray(getStreamData(activity, ["Heart Rate"]));
-  const speedData = toOptionalNumberArray(
-    getStreamData(activity, ["Speed", "Speed in meters per minute"]),
+  const distanceSamples = getTimedStreamData(activity, ["Distance"]);
+  const cadenceSamples = getTimedStreamData(activity, ["Cadence"]);
+  const heartRateSamples = getTimedStreamData(activity, ["Heart Rate"]);
+  const speedSamples = getTimedStreamData(
+    activity,
+    ["Speed", "Speed in meters per minute"],
   );
-  const altitudeData = toOptionalNumberArray(
-    getStreamData(activity, [
+  const altitudeSamples = getTimedStreamData(
+    activity,
+    [
       "Altitude",
+      "Altitude Smooth",
       "Altitude smooth",
       "Altitude GPS",
       "Fused Altitude",
-    ]),
+    ],
   );
-  const powerData = toOptionalNumberArray(getStreamData(activity, ["Power"]));
-  const latitudeData = toOptionalNumberArray(
-    getStreamData(activity, ["Latitude degrees"]),
+  const powerSamples = getTimedStreamData(activity, ["Power"]);
+  const latitudeSamples = getTimedStreamData(
+    activity,
+    ["Latitude", "Latitude degrees"],
   );
-  const longitudeData = toOptionalNumberArray(
-    getStreamData(activity, ["Longitude degrees"]),
-  );
-
-  const sampleCount = Math.max(
-    distanceData.length,
-    cadenceData.length,
-    heartRateData.length,
-    speedData.length,
-    altitudeData.length,
-    powerData.length,
-    latitudeData.length,
-    longitudeData.length,
-    0,
+  const longitudeSamples = getTimedStreamData(
+    activity,
+    ["Longitude", "Longitude degrees"],
   );
 
-  return Array.from({ length: sampleCount }, (_, index) => {
-    const realTs = index < realTimestamps.length ? realTimestamps[index] : undefined;
-    const elapsedMs =
-      startedAtMs !== undefined && realTs !== undefined
-        ? realTs - startedAtMs
-        : index * 1000;
+  const elapsedMsSet = new Set<number>();
+  const addElapsedMs = (samples: TimedStreamSample[] | undefined): void => {
+    samples?.forEach((sample) => {
+      elapsedMsSet.add(sample.elapsedMs);
+    });
+  };
 
-    return {
+  addElapsedMs(distanceSamples);
+  addElapsedMs(cadenceSamples);
+  addElapsedMs(heartRateSamples);
+  addElapsedMs(speedSamples);
+  addElapsedMs(altitudeSamples);
+  addElapsedMs(powerSamples);
+  addElapsedMs(latitudeSamples);
+  addElapsedMs(longitudeSamples);
+
+  if (startedAtMs !== undefined) {
+    realTimestamps.forEach((timestampMs) => {
+      elapsedMsSet.add(timestampMs - startedAtMs);
+    });
+  } else {
+    realTimestamps.forEach((_, index) => {
+      elapsedMsSet.add(index * 1000);
+    });
+  }
+
+  const buildValueMap = (
+    samples: TimedStreamSample[] | undefined,
+  ): Map<number, number | undefined> => {
+    return new Map(samples?.map((sample) => [sample.elapsedMs, sample.value]) ?? []);
+  };
+
+  const distanceByElapsedMs = buildValueMap(distanceSamples);
+  const cadenceByElapsedMs = buildValueMap(cadenceSamples);
+  const heartRateByElapsedMs = buildValueMap(heartRateSamples);
+  const speedByElapsedMs = buildValueMap(speedSamples);
+  const altitudeByElapsedMs = buildValueMap(altitudeSamples);
+  const powerByElapsedMs = buildValueMap(powerSamples);
+  const latitudeByElapsedMs = buildValueMap(latitudeSamples);
+  const longitudeByElapsedMs = buildValueMap(longitudeSamples);
+
+  return Array.from(elapsedMsSet)
+    .sort((left, right) => left - right)
+    .map((elapsedMs) => ({
       timestampMs:
-        realTs ?? (startedAtMs !== undefined ? startedAtMs + elapsedMs : elapsedMs),
+        startedAtMs !== undefined
+          ? startedAtMs + elapsedMs
+          : elapsedMs,
       elapsedMs,
-      lat: latitudeData[index],
-      lon: longitudeData[index],
-      altitudeM: altitudeData[index],
-      distanceM: distanceData[index],
-      speedMps: speedData[index],
-      heartRateBpm: heartRateData[index],
+      lat: latitudeByElapsedMs.get(elapsedMs),
+      lon: longitudeByElapsedMs.get(elapsedMs),
+      altitudeM: altitudeByElapsedMs.get(elapsedMs),
+      distanceM: distanceByElapsedMs.get(elapsedMs),
+      speedMps: speedByElapsedMs.get(elapsedMs),
+      heartRateBpm: heartRateByElapsedMs.get(elapsedMs),
       ascentM: undefined,
       gradePct: undefined,
-      cadenceRpm: cadenceData[index],
-      powerW: powerData[index],
-    };
-  });
+      cadenceRpm: cadenceByElapsedMs.get(elapsedMs),
+      powerW: powerByElapsedMs.get(elapsedMs),
+    }));
 };
 
 export const loadActivity = async (filePath: string): Promise<Activity> => {

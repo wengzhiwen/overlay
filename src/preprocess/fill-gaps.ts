@@ -1,6 +1,10 @@
 import type { Activity, ActivitySample, DataGap } from "../domain/activity.js";
 
-const createGapSample = (elapsedMs: number, timestampMs: number): ActivitySample => ({
+const createGapSample = (
+  elapsedMs: number,
+  timestampMs: number,
+  isDataGap: boolean,
+): ActivitySample => ({
   timestampMs,
   elapsedMs,
   lat: undefined,
@@ -13,58 +17,51 @@ const createGapSample = (elapsedMs: number, timestampMs: number): ActivitySample
   gradePct: undefined,
   cadenceRpm: undefined,
   powerW: undefined,
-  isDataGap: true,
+  isDataGap,
 });
 
 export const fillShortGaps = (
   activity: Activity,
   gaps: DataGap[],
 ): Activity => {
-  if (gaps.length === 0) {
+  if (activity.samples.length <= 1) {
     return activity;
   }
 
   const startedAtMs = activity.startedAt ? new Date(activity.startedAt).getTime() : undefined;
+  const gapsByAfterIndex = new Map<number, DataGap>(
+    gaps.map((gap) => [gap.afterIndex, gap]),
+  );
   const filled: ActivitySample[] = [];
-  let sampleIndex = 0;
 
-  for (const gap of gaps) {
-    // Copy samples before the gap
-    while (sampleIndex <= gap.afterIndex) {
-      filled.push(activity.samples[sampleIndex]!);
-      sampleIndex += 1;
+  for (let index = 0; index < activity.samples.length - 1; index += 1) {
+    const current = activity.samples[index]!;
+    const next = activity.samples[index + 1]!;
+
+    filled.push(current);
+
+    const deltaSeconds = Math.round((next.elapsedMs - current.elapsedMs) / 1000);
+    const missingSeconds = Math.max(0, deltaSeconds - 1);
+    const gap = gapsByAfterIndex.get(index);
+
+    for (let offset = 1; offset <= missingSeconds; offset += 1) {
+      const elapsedMs = current.elapsedMs + offset * 1000;
+      const timestampMs = startedAtMs !== undefined
+        ? startedAtMs + elapsedMs
+        : elapsedMs;
+      const isDataGap =
+        gap !== undefined &&
+        elapsedMs >= gap.startMs &&
+        elapsedMs < gap.endMs;
+
+      filled.push(createGapSample(elapsedMs, timestampMs, isDataGap));
     }
-
-    // Insert gap samples
-    const gapDurationMs = gap.endMs - gap.startMs;
-    const gapSampleCount = Math.round(gapDurationMs / 1000);
-
-    for (let offset = 0; offset < gapSampleCount; offset += 1) {
-      const gapElapsedMs = gap.startMs + offset * 1000;
-      const gapTimestampMs = startedAtMs !== undefined
-        ? startedAtMs + gapElapsedMs
-        : gapElapsedMs;
-
-      filled.push(createGapSample(gapElapsedMs, gapTimestampMs));
-    }
-
-    // sampleIndex now points to gap.beforeIndex, continue from there
   }
 
-  // Copy remaining samples
-  while (sampleIndex < activity.samples.length) {
-    filled.push(activity.samples[sampleIndex]!);
-    sampleIndex += 1;
-  }
+  filled.push(activity.samples[activity.samples.length - 1]!);
 
-  // Reindex elapsedMs to continuous 1-second intervals
-  const reindexed = filled.map((sample, index) => ({
-    ...sample,
-    elapsedMs: index * 1000,
-  }));
-
-  const durationMs = reindexed.length > 0
-    ? reindexed[reindexed.length - 1]!.elapsedMs
+  const durationMs = filled.length > 0
+    ? filled[filled.length - 1]!.elapsedMs
     : activity.summary.durationMs ?? 0;
 
   return {
@@ -73,6 +70,6 @@ export const fillShortGaps = (
       ...activity.summary,
       durationMs,
     },
-    samples: reindexed,
+    samples: filled,
   };
 };
