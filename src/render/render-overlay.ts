@@ -1,6 +1,7 @@
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { createWriteStream } from "node:fs";
+import { rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import { bundle } from "@remotion/bundler";
@@ -33,6 +34,7 @@ export type RenderOverlayRequest = {
   outputPath?: string | undefined;
   maxDurationMs?: number | undefined;
   concurrency?: number | undefined;
+  segments?: number | undefined;
   onProgress?: ((message: string) => void) | undefined;
 };
 
@@ -226,6 +228,182 @@ const formatEta = (seconds: number): string => {
   const h = Math.floor(seconds / 3600);
   const m = Math.ceil((seconds % 3600) / 60);
   return `${h}h ${String(m).padStart(2, "0")}m`;
+};
+
+const MIN_SEGMENT_SECONDS = 10;
+
+type FrameRange = [number, number];
+
+const calculateSegments = (
+  requestedSegments: number,
+  totalFrames: number,
+  fps: number,
+): FrameRange[] => {
+  const totalSeconds = Math.floor(totalFrames / fps);
+  const maxSegments = Math.max(1, Math.floor(totalSeconds / MIN_SEGMENT_SECONDS));
+  const actualSegments = Math.max(1, Math.min(requestedSegments, maxSegments));
+
+  if (actualSegments <= 1) {
+    return [[0, totalFrames - 1]];
+  }
+
+  const secondsPerSegment = Math.floor(totalSeconds / actualSegments);
+  const framesPerSegment = secondsPerSegment * Math.round(fps);
+  const ranges: FrameRange[] = [];
+
+  for (let i = 0; i < actualSegments; i++) {
+    const start = i * framesPerSegment;
+    const end = i === actualSegments - 1
+      ? totalFrames - 1
+      : (i + 1) * framesPerSegment - 1;
+    if (start <= end) {
+      ranges.push([start, end]);
+    }
+  }
+
+  return ranges;
+};
+
+const checkFfmpegAvailable = async (): Promise<boolean> => {
+  try {
+    await execFileAsync("ffmpeg", ["-version"]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const ffmpegConcat = async (
+  segmentPaths: string[],
+  outputPath: string,
+  logger: StepLogger,
+): Promise<void> => {
+  const concatListPath = path.join(path.dirname(outputPath), "concat.txt");
+  const concatContent = segmentPaths
+    .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
+    .join("\n");
+  await writeFile(concatListPath, concatContent, "utf8");
+
+  logger.info(`Concatenating ${segmentPaths.length} segment(s) with FFmpeg.`);
+
+  try {
+    await execFileAsync("ffmpeg", [
+      "-f", "concat",
+      "-safe", "0",
+      "-i", concatListPath,
+      "-c", "copy",
+      "-y",
+      outputPath,
+    ], { timeout: 300_000 });
+  } finally {
+    await rm(concatListPath, { force: true });
+  }
+};
+
+const renderMovSegmented = async (
+  serveUrl: string,
+  composition: Awaited<ReturnType<typeof selectComposition>>,
+  inputProps: {
+    frameData: FrameData;
+    overlayConfig: OverlayConfig;
+  },
+  targetFilePath: string,
+  logger: StepLogger,
+  concurrency: number | undefined,
+  segments: number,
+): Promise<void> => {
+  const totalFrames = composition.durationInFrames;
+  const ranges = calculateSegments(segments, totalFrames, composition.fps);
+
+  if (ranges.length <= 1) {
+    logger.info(
+      `Requested ${segments} segment(s) but duration too short. Falling back to single render.`,
+    );
+    await renderMov(serveUrl, composition, inputProps, targetFilePath, logger, concurrency);
+    return;
+  }
+
+  logger.info(
+    `Rendering ${ranges.length} segment(s) in parallel. Total: ${totalFrames} frames at ${composition.fps}fps.`,
+  );
+
+  // Each renderMedia registers signal handlers; raise limit to avoid warnings and premature kills
+  process.setMaxListeners(process.getMaxListeners() + ranges.length);
+
+  const segmentsDir = path.join(path.dirname(targetFilePath), "segments");
+  await ensureDirectoryPath(segmentsDir);
+
+  const segmentPaths = ranges.map(
+    (_, i) => path.join(segmentsDir, `seg_${String(i).padStart(3, "0")}.mov`),
+  );
+
+  // Render all segments in parallel
+  const perSegmentConcurrency = concurrency
+    ? Math.max(1, Math.floor(concurrency / ranges.length))
+    : null;
+  logger.info(
+    `Per-segment concurrency: ${perSegmentConcurrency ?? "auto"} (${ranges.length} segment(s)).`,
+  );
+
+  const startedAt = Date.now();
+  await Promise.all(
+    ranges.map(([start, end], i) => {
+      const durationSec = ((end - start + 1) / composition.fps).toFixed(1);
+      logger.info(
+        `Segment ${i}: frames ${start}–${end} (${durationSec}s) → ${path.basename(segmentPaths[i]!)}`,
+      );
+
+      let lastBucket = -1;
+      return renderMedia({
+        serveUrl,
+        composition,
+        inputProps,
+        codec: "prores",
+        proResProfile: "4444",
+        imageFormat: "png",
+        pixelFormat: PRORES_ALPHA_PIXEL_FORMAT,
+        outputLocation: segmentPaths[i]!,
+        overwrite: true,
+        muted: true,
+        logLevel: "error",
+        concurrency: perSegmentConcurrency,
+        frameRange: [start, end],
+        onProgress: (progress) => {
+          const bucket = Math.floor(progress.progress * 20);
+          if (bucket !== lastBucket) {
+            lastBucket = bucket;
+            logger.info(
+              `Segment ${i}: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${end - start + 1}`,
+            );
+          }
+        },
+      });
+    }),
+  );
+
+  const renderMs = Date.now() - startedAt;
+  logger.info(
+    `All ${ranges.length} segment(s) rendered in ${(renderMs / 1000).toFixed(1)}s. Concatenating.`,
+  );
+
+  // Concatenate segments
+  const hasFfmpeg = await checkFfmpegAvailable();
+  if (!hasFfmpeg) {
+    logger.warn(
+      "FFmpeg not found. Cannot concatenate segments. Leaving individual segment files in segments/ directory.",
+    );
+    logger.info(`Segment files: ${segmentPaths.join(", ")}`);
+    // Copy first segment as the output (partial result)
+    await execFileAsync("cp", [segmentPaths[0]!, targetFilePath]);
+    return;
+  }
+
+  await ffmpegConcat(segmentPaths, targetFilePath, logger);
+  logger.info(`Concatenation complete. Output: ${targetFilePath}`);
+
+  // Clean up segment files
+  await rm(segmentsDir, { recursive: true, force: true });
+  logger.info("Cleaned up temporary segment files.");
 };
 
 const renderMov = async (
@@ -494,7 +672,15 @@ export const renderOverlay = async (
       }
 
       const movFilePath = path.join(outputPath, "overlay.mov");
-      await renderMov(serveUrl, composition, inputProps, movFilePath, logger, request.concurrency);
+      const requestedSegments = request.segments ?? 1;
+      if (requestedSegments > 1) {
+        await renderMovSegmented(
+          serveUrl, composition, inputProps, movFilePath, logger,
+          request.concurrency, requestedSegments,
+        );
+      } else {
+        await renderMov(serveUrl, composition, inputProps, movFilePath, logger, request.concurrency);
+      }
       return movFilePath;
     },
   );

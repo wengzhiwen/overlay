@@ -26,6 +26,7 @@ export type RenderCommandOptions = {
   output?: string;
   sample?: boolean;
   concurrency?: string;
+  segments?: number;
 };
 
 const ensureReadableFile = async (
@@ -71,6 +72,7 @@ export const runRenderCommand = async (
     outputPath,
     maxDurationMs: options.sample ? 30_000 : undefined,
     concurrency,
+    segments: options.segments,
     onProgress: (message) => {
       console.log(message);
     },
