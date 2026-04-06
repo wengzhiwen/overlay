@@ -9,7 +9,7 @@ export const TimeWidget = ({
   config,
   theme,
 }: BaseWidgetProps<TimeWidgetConfig>) => {
-  const elapsed = formatDurationMs(frame.elapsedMs, config.elapsedFormat);
+  const elapsed = formatDurationMs(frame.displayElapsedMs, config.elapsedFormat);
   const clock = formatClockTime(
     frame.clockTimeIso,
     config.timezone,

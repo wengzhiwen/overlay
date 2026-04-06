@@ -6,6 +6,7 @@ export const SNAPSHOT_INTERVAL_MS = 1000;
 export type FrameSnapshot = {
   frame: number;
   elapsedMs: number;
+  displayElapsedMs: number;
   renderTimeMs: number;
   isActive: boolean;
   isDataGap: boolean;

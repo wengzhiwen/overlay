@@ -52,6 +52,7 @@ export const buildFrameData = async (
   config: OverlayConfig,
   options?: {
     maxDurationMs?: number | undefined;
+    elapsedOffsetMs?: number | undefined;
   },
 ): Promise<FrameData> => {
   const baseDurationMs = getEffectiveDurationMs(activity, config);
@@ -69,6 +70,7 @@ export const buildFrameData = async (
     : undefined;
   const trimStartMs =
     config.render.durationStrategy === "trimmed" ? config.sync.trimStartMs : 0;
+  const elapsedOffsetMs = options?.elapsedOffsetMs ?? 0;
 
   const frames: FrameSnapshot[] = Array.from(
     { length: snapshotCount },
@@ -85,6 +87,7 @@ export const buildFrameData = async (
       return {
         frame,
         elapsedMs: clampedElapsedMs,
+        displayElapsedMs: clampedElapsedMs + elapsedOffsetMs,
         renderTimeMs,
         isActive,
         isDataGap: sample?.isDataGap ?? false,

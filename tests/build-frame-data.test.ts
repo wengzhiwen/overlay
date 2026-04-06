@@ -115,4 +115,25 @@ describe("buildFrameData", () => {
     expect(frameData.frames).toHaveLength(1);
     expect(frameData.frames.at(-1)?.elapsedMs).toBe(0);
   });
+
+  it("supports an elapsed offset for continued timing across split segments", async () => {
+    const frameData = await buildFrameData(
+      activity,
+      {
+        ...defaultOverlayConfig,
+        render: {
+          ...defaultOverlayConfig.render,
+          fps: 1,
+          durationStrategy: "activity",
+        },
+      },
+      {
+        elapsedOffsetMs: 601_000,
+      },
+    );
+
+    expect(frameData.frames[0]?.elapsedMs).toBe(0);
+    expect(frameData.frames[0]?.displayElapsedMs).toBe(601_000);
+    expect(frameData.frames[1]?.displayElapsedMs).toBe(602_000);
+  });
 });

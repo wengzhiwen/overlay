@@ -863,6 +863,7 @@ export const renderOverlay = async (
   // Process each segment sequentially: derive → interpolate → smooth → fill gaps →
   // build frame data → write frame data → render.
   const renderOutputs: Array<{ path: string; startedAt: string | undefined }> = [];
+  let cumulativeElapsedOffsetMs = 0;
 
   for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
     const segment = activitySegments[segmentIndex]!;
@@ -926,6 +927,7 @@ export const renderOverlay = async (
       async (logger) => {
         logger.info("Building frame data.");
         const built = await buildFrameData(processedActivity, config, {
+          elapsedOffsetMs: cumulativeElapsedOffsetMs,
           maxDurationMs: request.maxDurationMs,
         });
         logger.info(
@@ -1090,6 +1092,11 @@ export const renderOverlay = async (
     };
 
     await writeJsonFile(path.join(segmentOutputPath, "metadata.json"), metadata);
+
+    cumulativeElapsedOffsetMs += processedActivity.summary.durationMs ?? 0;
+    if (segmentIndex < activitySegments.length - 1) {
+      cumulativeElapsedOffsetMs += SNAPSHOT_INTERVAL_MS;
+    }
   }
 
   await runLoggedStep(
