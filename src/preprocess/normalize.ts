@@ -15,20 +15,19 @@ export const normalizeActivity = async (
 
       return index === 0 || (previous !== undefined && sample.elapsedMs > previous.elapsedMs);
     })
-    .map((sample, index) => {
-      const elapsedMs = index * 1000;
-
-      return {
-        ...sample,
-        elapsedMs,
-        timestampMs:
-          startedAtMs === undefined ? elapsedMs : startedAtMs + elapsedMs,
-      };
-    });
+    .map((sample) => ({
+      ...sample,
+      // Keep gap-aware elapsedMs (do NOT reindex to index * 1000)
+      // Only recalculate timestampMs for consistency
+      timestampMs:
+        startedAtMs === undefined
+          ? sample.elapsedMs
+          : startedAtMs + sample.elapsedMs,
+    }));
 
   const durationMs =
     normalizedSamples.length > 0
-      ? normalizedSamples[normalizedSamples.length - 1]?.elapsedMs
+      ? normalizedSamples[normalizedSamples.length - 1]!.elapsedMs
       : activity.summary.durationMs;
 
   return {

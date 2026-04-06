@@ -1,5 +1,7 @@
 import type { Activity } from "../domain/activity.js";
 
+import { GAP_THRESHOLD_MS } from "./detect-gaps.js";
+
 const clampGrade = (gradePct: number): number => {
   return Math.max(-35, Math.min(35, gradePct));
 };
@@ -24,6 +26,16 @@ export const deriveMetrics = async (activity: Activity): Promise<Activity> => {
       };
     }
 
+    // Skip delta computation across gap boundaries
+    const timeDeltaMs = sample.elapsedMs - previous.elapsedMs;
+
+    if (timeDeltaMs > GAP_THRESHOLD_MS) {
+      return {
+        ...sample,
+        ascentM: accumulatedAscentM,
+      };
+    }
+
     const distanceDeltaM =
       sample.distanceM !== undefined && previous.distanceM !== undefined
         ? sample.distanceM - previous.distanceM
@@ -39,7 +51,9 @@ export const deriveMetrics = async (activity: Activity): Promise<Activity> => {
 
     const speedMps =
       sample.speedMps ??
-      (distanceDeltaM !== undefined ? Math.max(0, distanceDeltaM) : undefined);
+      (distanceDeltaM !== undefined
+        ? Math.max(0, distanceDeltaM / (timeDeltaMs / 1000))
+        : undefined);
 
     const gradePct =
       distanceDeltaM !== undefined &&

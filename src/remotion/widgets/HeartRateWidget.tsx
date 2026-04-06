@@ -50,6 +50,7 @@ export const HeartRateWidget = ({
   frameData,
   config,
   theme,
+  isEmpty,
 }: BaseWidgetProps<HeartRateWidgetConfig>) => {
   const heartRateValue =
     frame.metrics.heartRateBpm === undefined
@@ -83,6 +84,7 @@ export const HeartRateWidget = ({
       unit={config.showUnit ? "bpm" : undefined}
       secondary={chartElement}
       valueColor={getZoneColor(frame.metrics.heartRateBpm, config)}
+      isEmpty={isEmpty}
     />
   );
 };

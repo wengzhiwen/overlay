@@ -88,9 +88,46 @@ const toOptionalNumberArray = (
   return values?.map((value) => (value === null ? undefined : value)) ?? [];
 };
 
+const extractTimestamps = (
+  content: string,
+  format: ActivitySourceFormat,
+): number[] => {
+  const document = new DOMParser().parseFromString(content, "text/xml");
+
+  if (format === "tcx") {
+    const elements = document.getElementsByTagName("Time");
+
+    return Array.from(elements)
+      .map((el) => {
+        const text = el.textContent?.trim();
+
+        return text ? new Date(text).getTime() : NaN;
+      })
+      .filter((ts) => !isNaN(ts));
+  }
+
+  // GPX: timestamps are <time> children of <trkpt>
+  const trkpts = document.getElementsByTagName("trkpt");
+
+  return Array.from(trkpts)
+    .map((tp) => {
+      const timeElements = tp.getElementsByTagName("time");
+
+      if (timeElements.length === 0) {
+        return NaN;
+      }
+
+      const text = timeElements[0]?.textContent?.trim();
+
+      return text ? new Date(text).getTime() : NaN;
+    })
+    .filter((ts) => !isNaN(ts));
+};
+
 const buildSamples = (
   activity: SportsActivity,
   startedAtMs: number | undefined,
+  realTimestamps: number[],
 ): ActivitySample[] => {
   const distanceData = toOptionalNumberArray(getStreamData(activity, ["Distance"]));
   const cadenceData = toOptionalNumberArray(getStreamData(activity, ["Cadence"]));
@@ -127,10 +164,15 @@ const buildSamples = (
   );
 
   return Array.from({ length: sampleCount }, (_, index) => {
-    const elapsedMs = index * 1000;
+    const realTs = index < realTimestamps.length ? realTimestamps[index] : undefined;
+    const elapsedMs =
+      startedAtMs !== undefined && realTs !== undefined
+        ? realTs - startedAtMs
+        : index * 1000;
 
     return {
-      timestampMs: startedAtMs === undefined ? elapsedMs : startedAtMs + elapsedMs,
+      timestampMs:
+        realTs ?? (startedAtMs !== undefined ? startedAtMs + elapsedMs : elapsedMs),
       elapsedMs,
       lat: latitudeData[index],
       lon: longitudeData[index],
@@ -146,24 +188,18 @@ const buildSamples = (
   });
 };
 
-const loadSportsEvent = async (
-  filePath: string,
-  format: ActivitySourceFormat,
-): Promise<SportsEvent> => {
-  const content = await readTextFile(filePath);
-
-  if (format === "gpx") {
-    return (await SportsLib.importFromGPX(content, DOMParser)) as SportsEvent;
-  }
-
-  const document = new DOMParser().parseFromString(content, "text/xml");
-
-  return (await SportsLib.importFromTCX(document as unknown as XMLDocument)) as SportsEvent;
-};
-
 export const loadActivity = async (filePath: string): Promise<Activity> => {
   const format = detectActivitySourceFormat(filePath);
-  const event = await loadSportsEvent(filePath, format);
+  const content = await readTextFile(filePath);
+  let event: SportsEvent;
+
+  if (format === "gpx") {
+    event = (await SportsLib.importFromGPX(content, DOMParser)) as SportsEvent;
+  } else {
+    const document = new DOMParser().parseFromString(content, "text/xml");
+    event = (await SportsLib.importFromTCX(document as unknown as XMLDocument)) as SportsEvent;
+  }
+
   const sourceActivity = event.activities?.[0];
 
   if (!sourceActivity) {
@@ -172,7 +208,8 @@ export const loadActivity = async (filePath: string): Promise<Activity> => {
 
   const startedAt = sourceActivity.startDate?.toISOString();
   const startedAtMs = sourceActivity.startDate?.getTime();
-  const samples = buildSamples(sourceActivity, startedAtMs);
+  const realTimestamps = extractTimestamps(content, format);
+  const samples = buildSamples(sourceActivity, startedAtMs, realTimestamps);
   const distanceM = getLastDefinedValue(samples.map((sample) => sample.distanceM));
   const summaryDurationMs =
     sourceActivity.startDate && sourceActivity.endDate
@@ -220,5 +257,6 @@ export const loadActivity = async (filePath: string): Promise<Activity> => {
       ascentM: undefined,
     },
     samples,
+    gaps: [],
   };
 };

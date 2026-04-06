@@ -22,6 +22,7 @@ export const DistanceWidget = ({
   frame,
   config,
   theme,
+  isEmpty,
 }: BaseWidgetProps<DistanceWidgetConfig>) => {
   return (
     <WidgetShell
@@ -32,6 +33,7 @@ export const DistanceWidget = ({
       unit={config.showUnit ? config.unit : undefined}
       secondary={undefined}
       valueColor={undefined}
+      isEmpty={isEmpty}
     />
   );
 };

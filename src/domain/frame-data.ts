@@ -8,6 +8,7 @@ export type FrameSnapshot = {
   elapsedMs: number;
   renderTimeMs: number;
   isActive: boolean;
+  isDataGap: boolean;
   metrics: ActivityMetrics;
   position:
     | {

@@ -16,6 +16,7 @@ export const ElevationWidget = ({
   frame,
   config,
   theme,
+  isEmpty,
 }: BaseWidgetProps<ElevationWidgetConfig>) => {
   const altitude = convertAltitude(frame.metrics.altitudeM, config.altitudeUnit);
   const ascent = convertAltitude(frame.metrics.ascentM, config.ascentUnit);
@@ -35,6 +36,7 @@ export const ElevationWidget = ({
           : undefined
       }
       valueColor={undefined}
+      isEmpty={isEmpty}
     />
   );
 };

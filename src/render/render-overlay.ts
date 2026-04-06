@@ -13,15 +13,19 @@ import { SNAPSHOT_INTERVAL_MS } from "../domain/frame-data.js";
 import type { FrameDataMeta } from "../remotion/Root.js";
 import { loadActivity } from "../parsers/activity-loader.js";
 import { buildFrameData } from "../preprocess/build-frame-data.js";
+import { detectGaps } from "../preprocess/detect-gaps.js";
 import { deriveMetrics } from "../preprocess/derive-metrics.js";
+import { fillShortGaps } from "../preprocess/fill-gaps.js";
 import { interpolateActivity } from "../preprocess/interpolate.js";
 import { normalizeActivity } from "../preprocess/normalize.js";
 import { smoothActivity } from "../preprocess/smooth.js";
+import { splitActivityAtLongGaps } from "../preprocess/split-activity.js";
 import { PRORES_ALPHA_PIXEL_FORMAT } from "./codecs.js";
 import {
   copyFileToDirectory,
   createTimestampedOutputDirectory,
   ensureDirectoryPath,
+  formatLocalTimestamp,
   writeJsonFile,
 } from "../utils/files.js";
 
@@ -39,6 +43,7 @@ export type RenderOverlayResult = {
   exitCode: number;
   message: string;
   outputPath: string;
+  outputs: Array<{ path: string; startedAt: string | undefined }>;
 };
 
 type RenderMetadata = {
@@ -795,64 +800,32 @@ export const renderOverlay = async (
     },
   );
 
-  const derivedActivity = await runLoggedStep(
-    "04-derive-metrics.log",
+  // Step 04: Detect gaps in the normalized activity.
+  const classifiedGaps = await runLoggedStep(
+    "04-detect-gaps.log",
     logsDirectoryPath,
     onProgress,
     async (logger) => {
-      logger.info("Deriving metrics.");
-      const activity = await deriveMetrics(normalizedActivity);
-      logger.info("Metric derivation finished.");
-      return activity;
+      const result = detectGaps(normalizedActivity);
+      logger.info(`Detected ${result.shortGaps.length} short gap(s) and ${result.longGaps.length} long gap(s).`);
+      return result;
     },
   );
 
-  const processedActivity = await runLoggedStep(
-    "05-interpolate-and-smooth.log",
-    logsDirectoryPath,
-    onProgress,
-    async (logger) => {
-      logger.info("Interpolating missing samples.");
-      const interpolated = await interpolateActivity(derivedActivity, config);
-      logger.info("Applying smoothing.");
-      const smoothed = await smoothActivity(interpolated, config);
-      logger.info("Processed activity is ready.");
-      return smoothed;
-    },
+  // Split activity at long gaps into independent segments.
+  const activitySegments = splitActivityAtLongGaps(
+    normalizedActivity,
+    classifiedGaps.longGaps,
+    classifiedGaps.shortGaps,
   );
 
-  const frameData = await runLoggedStep(
-    "06-build-frame-data.log",
-    logsDirectoryPath,
-    onProgress,
-    async (logger) => {
-      logger.info("Building frame data.");
-      const built = await buildFrameData(processedActivity, config, {
-        maxDurationMs: request.maxDurationMs,
-      });
-      logger.info(
-        `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
-      );
-      return built;
-    },
-  );
-
-  await copyFileToDirectory(request.inputPath, sourceDirectoryPath);
-  await copyFileToDirectory(request.configPath, sourceDirectoryPath);
-
-  if (config.debug.dumpNormalizedActivity) {
-    await writeJsonFile(
-      path.join(debugDirectoryPath, "activity.normalized.json"),
-      processedActivity,
-    );
+  if (activitySegments.length > 1) {
+    onProgress(`Activity split into ${activitySegments.length} segment(s) after gap detection.`);
   }
 
-  if (config.debug.dumpFrameData) {
-    await writeJsonFile(path.join(debugDirectoryPath, "frame-data.json"), frameData);
-  }
-
+  // Build and bundle Remotion ONCE — shared across all segments.
   await runLoggedStep(
-    "07-build-project.log",
+    "05-build-project.log",
     logsDirectoryPath,
     onProgress,
     async (logger) => {
@@ -861,7 +834,7 @@ export const renderOverlay = async (
   );
 
   const serveUrl = await runLoggedStep(
-    "08-bundle-remotion.log",
+    "06-bundle-remotion.log",
     logsDirectoryPath,
     onProgress,
     async (logger) => {
@@ -872,104 +845,241 @@ export const renderOverlay = async (
     },
   );
 
-  // Write frame data to serve directory for file-based loading.
-  // Passing 500K+ frames through Chrome script injection causes OOM crashes
-  // because each parallel renderMedia call serializes inputProps via JSON.stringify.
-  await runLoggedStep(
-    "08b-write-frame-data.log",
-    logsDirectoryPath,
-    onProgress,
-    async (logger) => {
-      logger.info("Writing frame data to serve directory for file-based loading.");
-      const filePath = path.join(serveUrl, FRAME_DATA_FILENAME);
-      await writeJsonFile(filePath, frameData.frames);
-      logger.info(
-        `Wrote ${frameData.frames.length} frame(s) to ${FRAME_DATA_FILENAME}.`,
+  await copyFileToDirectory(request.inputPath, sourceDirectoryPath);
+  await copyFileToDirectory(request.configPath, sourceDirectoryPath);
+
+  // Process each segment sequentially: derive → interpolate → smooth → fill gaps →
+  // build frame data → write frame data → render.
+  const renderOutputs: Array<{ path: string; startedAt: string | undefined }> = [];
+
+  for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
+    const segment = activitySegments[segmentIndex]!;
+    const segmentLabel = activitySegments.length > 1
+      ? `segment ${segmentIndex + 1}/${activitySegments.length}`
+      : "activity";
+
+    onProgress(`Processing ${segmentLabel}...`);
+
+    const derivedActivity = await runLoggedStep(
+      `07-${String(segmentIndex).padStart(2, "0")}-derive-metrics.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info(`Deriving metrics for ${segmentLabel}.`);
+        const activity = await deriveMetrics(segment);
+        logger.info("Metric derivation finished.");
+        return activity;
+      },
+    );
+
+    const interpolatedActivity = await runLoggedStep(
+      `08-${String(segmentIndex).padStart(2, "0")}-interpolate.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Interpolating missing samples.");
+        const activity = await interpolateActivity(derivedActivity, config);
+        return activity;
+      },
+    );
+
+    const smoothedActivity = await runLoggedStep(
+      `09-${String(segmentIndex).padStart(2, "0")}-smooth.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Applying smoothing.");
+        const activity = await smoothActivity(interpolatedActivity, config);
+        logger.info("Processed activity is ready.");
+        return activity;
+      },
+    );
+
+    const processedActivity = await runLoggedStep(
+      `10-${String(segmentIndex).padStart(2, "0")}-fill-gaps.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Filling short gaps.");
+        const activity = fillShortGaps(smoothedActivity, smoothedActivity.gaps);
+        logger.info(`Filled activity has ${activity.samples.length} sample(s).`);
+        return activity;
+      },
+    );
+
+    const frameData = await runLoggedStep(
+      `11-${String(segmentIndex).padStart(2, "0")}-build-frame-data.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Building frame data.");
+        const built = await buildFrameData(processedActivity, config, {
+          maxDurationMs: request.maxDurationMs,
+        });
+        logger.info(
+          `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
+        );
+        return built;
+      },
+    );
+
+    // Determine per-segment output directory using formatLocalTimestamp.
+    const segmentDirName = segment.startedAt
+      ? formatLocalTimestamp(new Date(segment.startedAt))
+      : formatLocalTimestamp(new Date());
+    const segmentOutputPath = activitySegments.length > 1
+      ? path.join(outputPath, segmentDirName)
+      : outputPath;
+
+    await ensureDirectoryPath(segmentOutputPath);
+
+    if (config.debug.dumpNormalizedActivity) {
+      await ensureDirectoryPath(path.join(segmentOutputPath, "debug"));
+      await writeJsonFile(
+        path.join(segmentOutputPath, "debug", "activity.normalized.json"),
+        processedActivity,
       );
-    },
-  );
+    }
 
-  // Pass lightweight metadata through inputProps; frames are loaded from file.
-  const { frames: _frames, ...frameDataMeta } = frameData;
-  const inputProps: RenderInputProps = {
-    frameDataMeta,
-    overlayConfig: config,
-  };
-
-  const composition: CompositionSpec = {
-    id: "OverlayComposition",
-    width: frameData.width,
-    height: frameData.height,
-    fps: frameData.fps,
-    durationInFrames: frameData.durationInFrames,
-    defaultProps: inputProps as unknown as Record<string, unknown>,
-    props: inputProps as unknown as Record<string, unknown>,
-    defaultCodec: null,
-    defaultOutName: null,
-    defaultVideoImageFormat: null,
-    defaultPixelFormat: null,
-    defaultProResProfile: null,
-  };
-
-  await runLoggedStep(
-    "09-select-composition.log",
-    logsDirectoryPath,
-    onProgress,
-    async (logger) => {
-      logger.info("Constructing composition metadata from frame data (bypassing selectComposition).");
-      logger.info(
-        `Composition: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames (${(composition.durationInFrames / composition.fps).toFixed(1)}s).`,
+    if (config.debug.dumpFrameData) {
+      await ensureDirectoryPath(path.join(segmentOutputPath, "debug"));
+      await writeJsonFile(
+        path.join(segmentOutputPath, "debug", "frame-data.json"),
+        frameData,
       );
-    },
-  );
+    }
 
-  const finalOutputPath = await runLoggedStep(
-    "10-render-overlay.log",
-    logsDirectoryPath,
-    onProgress,
-    async (logger) => {
-      if (config.render.output.format === "png-sequence") {
-        const framesDirectoryPath = path.join(outputPath, "frames");
-        await ensureDirectoryPath(framesDirectoryPath);
-        await renderPngSequence(
-          serveUrl,
-          composition,
-          inputProps,
-          framesDirectoryPath,
-          logger,
-          request.concurrency,
-          frameData.snapshotIntervalMs,
+    // Write frame data to serve directory for file-based loading.
+    await runLoggedStep(
+      `12-${String(segmentIndex).padStart(2, "0")}-write-frame-data.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Writing frame data to serve directory for file-based loading.");
+        const filePath = path.join(serveUrl, FRAME_DATA_FILENAME);
+        await writeJsonFile(filePath, frameData.frames);
+        logger.info(
+          `Wrote ${frameData.frames.length} frame(s) to ${FRAME_DATA_FILENAME}.`,
         );
-        return framesDirectoryPath;
-      }
+      },
+    );
 
-      const movFilePath = path.join(outputPath, "overlay.mov");
-      const requestedSegments = request.segments ?? 1;
-      if (requestedSegments > 1) {
-        await renderMovSegmented(
-          serveUrl, composition, inputProps, movFilePath, logger,
-          request.concurrency, requestedSegments,
-          config.render.output.proresProfile,
-          frameData.snapshotIntervalMs,
+    // Pass lightweight metadata through inputProps; frames are loaded from file.
+    const { frames: _frames, ...frameDataMeta } = frameData;
+    const inputProps: RenderInputProps = {
+      frameDataMeta,
+      overlayConfig: config,
+    };
+
+    const composition: CompositionSpec = {
+      id: "OverlayComposition",
+      width: frameData.width,
+      height: frameData.height,
+      fps: frameData.fps,
+      durationInFrames: frameData.durationInFrames,
+      defaultProps: inputProps as unknown as Record<string, unknown>,
+      props: inputProps as unknown as Record<string, unknown>,
+      defaultCodec: null,
+      defaultOutName: null,
+      defaultVideoImageFormat: null,
+      defaultPixelFormat: null,
+      defaultProResProfile: null,
+    };
+
+    await runLoggedStep(
+      `13-${String(segmentIndex).padStart(2, "0")}-select-composition.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        logger.info("Constructing composition metadata from frame data (bypassing selectComposition).");
+        logger.info(
+          `Composition: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames (${(composition.durationInFrames / composition.fps).toFixed(1)}s).`,
         );
-      } else {
-        await renderMov(
-          serveUrl,
-          composition,
-          inputProps,
-          movFilePath,
-          logger,
-          request.concurrency,
-          config.render.output.proresProfile,
-          frameData.snapshotIntervalMs,
-        );
-      }
-      return movFilePath;
-    },
-  );
+      },
+    );
+
+    const segmentFinalOutputPath = await runLoggedStep(
+      `14-${String(segmentIndex).padStart(2, "0")}-render-overlay.log`,
+      logsDirectoryPath,
+      onProgress,
+      async (logger) => {
+        if (config.render.output.format === "png-sequence") {
+          const framesDirectoryPath = path.join(segmentOutputPath, "frames");
+          await ensureDirectoryPath(framesDirectoryPath);
+          await renderPngSequence(
+            serveUrl,
+            composition,
+            inputProps,
+            framesDirectoryPath,
+            logger,
+            request.concurrency,
+            frameData.snapshotIntervalMs,
+          );
+          return framesDirectoryPath;
+        }
+
+        const movFilePath = path.join(segmentOutputPath, "overlay.mov");
+        const requestedSegments = request.segments ?? 1;
+        if (requestedSegments > 1) {
+          await renderMovSegmented(
+            serveUrl, composition, inputProps, movFilePath, logger,
+            request.concurrency, requestedSegments,
+            config.render.output.proresProfile,
+            frameData.snapshotIntervalMs,
+          );
+        } else {
+          await renderMov(
+            serveUrl,
+            composition,
+            inputProps,
+            movFilePath,
+            logger,
+            request.concurrency,
+            config.render.output.proresProfile,
+            frameData.snapshotIntervalMs,
+          );
+        }
+        return movFilePath;
+      },
+    );
+
+    renderOutputs.push({
+      path: segmentFinalOutputPath,
+      startedAt: segment.startedAt,
+    });
+
+    // Write per-segment metadata.
+    const metadata: RenderMetadata = {
+      runId,
+      createdAt: new Date().toISOString(),
+      input: {
+        activityFile: request.inputPath,
+        configFile: request.configPath,
+        format: processedActivity.source.format,
+      },
+      render: {
+        width: frameData.width,
+        height: frameData.height,
+        fps: frameData.fps,
+        durationInFrames: frameData.durationInFrames,
+        snapshotIntervalMs: frameData.snapshotIntervalMs,
+        outputFormat: config.render.output.format,
+        sampleMaxDurationMs: request.maxDurationMs,
+      },
+      activity: {
+        startedAt: processedActivity.startedAt,
+        durationMs: processedActivity.summary.durationMs,
+        distanceM: processedActivity.summary.distanceM,
+        ascentM: processedActivity.summary.ascentM,
+      },
+      warnings: processedActivity.warnings,
+    };
+
+    await writeJsonFile(path.join(segmentOutputPath, "metadata.json"), metadata);
+  }
 
   await runLoggedStep(
-    "11-postprocess.log",
+    "15-postprocess.log",
     logsDirectoryPath,
     onProgress,
     async (logger) => {
@@ -977,37 +1087,15 @@ export const renderOverlay = async (
     },
   );
 
-  const metadata: RenderMetadata = {
-    runId,
-    createdAt: new Date().toISOString(),
-    input: {
-      activityFile: request.inputPath,
-      configFile: request.configPath,
-      format: processedActivity.source.format,
-    },
-    render: {
-      width: frameData.width,
-      height: frameData.height,
-      fps: frameData.fps,
-      durationInFrames: frameData.durationInFrames,
-      snapshotIntervalMs: frameData.snapshotIntervalMs,
-      outputFormat: config.render.output.format,
-      sampleMaxDurationMs: request.maxDurationMs,
-    },
-    activity: {
-      startedAt: processedActivity.startedAt,
-      durationMs: processedActivity.summary.durationMs,
-      distanceM: processedActivity.summary.distanceM,
-      ascentM: processedActivity.summary.ascentM,
-    },
-    warnings: processedActivity.warnings,
-  };
-
-  await writeJsonFile(path.join(outputPath, "metadata.json"), metadata);
+  const outputPaths = renderOutputs.map((o) => o.path);
+  const message = renderOutputs.length === 1
+    ? `Overlay render completed successfully: ${outputPaths[0]}`
+    : `Overlay render completed: ${renderOutputs.length} segment(s) -> ${outputPaths.join(", ")}`;
 
   return {
     exitCode: 0,
-    message: `Overlay render completed successfully: ${finalOutputPath}`,
+    message,
     outputPath,
+    outputs: renderOutputs,
   };
 };

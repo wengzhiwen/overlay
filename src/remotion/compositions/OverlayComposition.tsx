@@ -35,7 +35,8 @@ const renderWidget = (
     return null;
   }
 
-  const baseProps = { frame, frameData, theme };
+  const isEmpty = frame?.isDataGap ?? false;
+  const baseProps = { frame, frameData, theme, isEmpty };
 
   switch (widget.type) {
     case "speed":

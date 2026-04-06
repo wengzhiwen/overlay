@@ -20,6 +20,15 @@ export type ActivitySample = {
   gradePct: number | undefined;
   cadenceRpm: number | undefined;
   powerW: number | undefined;
+  isDataGap?: boolean;
+};
+
+export type DataGap = {
+  afterIndex: number;
+  beforeIndex: number;
+  startMs: number;
+  endMs: number;
+  durationMs: number;
 };
 
 export type Activity = {
@@ -41,4 +50,5 @@ export type Activity = {
     ascentM: number | undefined;
   };
   samples: ActivitySample[];
+  gaps: DataGap[];
 };

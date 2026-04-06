@@ -9,6 +9,7 @@ export type BaseWidgetProps<TConfig extends WidgetConfig> = {
   frameData: FrameData;
   config: TConfig;
   theme: OverlayTheme;
+  isEmpty: boolean;
 };
 
 type WidgetShellProps = {
@@ -18,6 +19,7 @@ type WidgetShellProps = {
   value: string;
   unit: string | undefined;
   secondary: ReactNode | undefined;
+  isEmpty?: boolean | undefined;
   valueColor: string | undefined;
 };
 
@@ -28,15 +30,17 @@ export const WidgetShell = ({
   value,
   unit,
   secondary,
-  valueColor,
+  isEmpty = false,
+  valueColor: _valueColor,
 }: WidgetShellProps): ReactNode => {
+  void _valueColor;
   const containerStyle: CSSProperties = {
     position: "absolute",
     left: config.x,
     top: config.y,
     width: config.width,
     height: config.height,
-    opacity: config.opacity,
+    opacity: isEmpty ? config.opacity * 0.3 : config.opacity,
     padding: config.padding,
     backgroundColor: config.backgroundColor,
     borderColor: config.borderColor,
@@ -69,7 +73,7 @@ export const WidgetShell = ({
 
   const valueStyle: CSSProperties = {
     fontSize: config.valueFontSize,
-    color: valueColor ?? config.valueColor ?? theme.colors.text,
+    color: config.valueColor ?? theme.colors.text,
     fontWeight: 700,
     lineHeight: 1,
   };

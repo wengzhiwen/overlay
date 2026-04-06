@@ -21,6 +21,7 @@ export const SpeedWidget = ({
   frame,
   config,
   theme,
+  isEmpty,
 }: BaseWidgetProps<SpeedWidgetConfig>) => {
   return (
     <WidgetShell
@@ -31,6 +32,7 @@ export const SpeedWidget = ({
       unit={config.showUnit ? config.unit : undefined}
       secondary={undefined}
       valueColor={undefined}
+      isEmpty={isEmpty}
     />
   );
 };

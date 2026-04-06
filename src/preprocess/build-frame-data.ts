@@ -87,6 +87,7 @@ export const buildFrameData = async (
         elapsedMs: clampedElapsedMs,
         renderTimeMs,
         isActive,
+        isDataGap: sample?.isDataGap ?? false,
         metrics: {
           speedMps: sample?.speedMps,
           heartRateBpm: sample?.heartRateBpm,
