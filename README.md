@@ -109,12 +109,13 @@ The config file currently supports:
 - Output resolution, frame rate, and duration strategy
 - Output format: `mov` or `png-sequence`
 - Time sync parameters: offset / trim
-- Five basic widgets:
+- Six widgets:
   - `speed`
   - `heart-rate`
   - `elevation`
   - `distance`
   - `time`
+  - `noodlemap`
 - Global theme and per-widget position, size, and styling
 
 See [examples/sample-config.json](examples/sample-config.json) for a working example.
@@ -128,7 +129,7 @@ Implemented:
 - `GPX` / `TCX` input
 - Config loading with Zod validation
 - Activity normalization, interpolation, smoothing, and per-frame data generation
-- Remotion rendering for five basic widgets
+- Remotion rendering for six widgets, including a GPS noodle map
 - Transparent `MOV / ProRes 4444` export
 - `--sample` quick preview, `--concurrency` parallelism control, `--segments` parallel segmented rendering
 - Logging, debug artifacts, and metadata output
@@ -136,6 +137,5 @@ Implemented:
 Roadmap:
 
 - Better-looking widgets (definitely not my strong suit)
-- Map overlay
 - Power and cadence widgets
 - An online demo so people can quickly understand what this project does

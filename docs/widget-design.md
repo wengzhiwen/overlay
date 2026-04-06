@@ -100,7 +100,7 @@ type WidgetShellProps = {
 ```ts
 type BaseWidgetConfig = {
   id: string;
-  type: "speed" | "heart-rate" | "elevation" | "distance" | "time";
+  type: "speed" | "heart-rate" | "elevation" | "distance" | "time" | "noodlemap";
   enabled: boolean;                  // 默认 true
   x: number;                         // 默认 0
   y: number;                         // 默认 0
@@ -134,6 +134,7 @@ type BaseWidgetConfig = {
 | elevation  | 5:3         |
 | distance   | 5:3         |
 | time       | 2:1         |
+| noodlemap  | 5:3         |
 
 - 推导公式（在 Zod `.transform()` 中自动执行）：
   - `width = round(canvasWidth × scale)`
@@ -454,7 +455,54 @@ type TimeWidgetConfig = BaseWidgetConfig & {
 - 时区处理应统一在预处理或格式化工具层完成
 - 组件只负责消费已经准备好的时间值
 
-## 12. MVP 视觉风格
+## 12. NoodleMapWidget
+
+### 12.1 目标
+
+基于 GPS 轨迹绘制一个北上朝向的白色路径轮廓图，用最少的视觉元素表达路线形状。
+
+### 12.2 输入数据
+
+依赖字段：
+
+- `frameData.frames[*].position`
+- `frame.elapsedMs`
+
+### 12.3 默认显示内容
+
+- 默认尺寸与 `HeartRateWidget` 相同（宽高比 `5:3`）
+- 默认不显示标签
+- 默认线条颜色为白色
+- 默认线粗为中等（`M`）
+- 默认比例尺为绘图区满宽对应 `2km`
+
+### 12.4 绘制规则
+
+- 使用北上方向绘制：纬度增大向上， 经度增大向右
+- 以第一条有效 GPS 点为起点，并从 widget 绘图区中心开始落笔
+- 按时间顺序连接点
+- 若当前点与上一个有效 GPS 点的时间差大于 `20s`，则该点作为新段起点，只绘制点，不与上一段连线
+- 当轨迹触边时，优先平移已绘制内容继续容纳新路径
+- 当平移已无法继续容纳时，再缩小整体比例尺，直到当前已绘制轨迹完整落入 widget 内
+- 若整个源文件没有任何 GPS 点，则该 widget 即使出现在配置中也不渲染
+
+### 12.5 配置
+
+```ts
+type NoodleMapWidgetConfig = BaseWidgetConfig & {
+  type: "noodlemap";
+  showLabel?: boolean;               // 默认 false
+  lineColor?: string;                // 默认 "#ffffff"
+  lineWeight?: "S" | "M" | "L";      // 默认 "M"
+};
+```
+
+### 12.6 备注
+
+- 不叠加底图，不显示指南针，不显示当前位置图标
+- 该组件只负责轨迹形状表达，不负责地图语义
+
+## 13. MVP 视觉风格
 
 采用统一而克制的视觉风格：
 
@@ -466,12 +514,11 @@ type TimeWidgetConfig = BaseWidgetConfig & {
 
 先把差异放在"信息结构"上，而不是追求复杂皮肤系统。
 
-## 13. 后续扩展点
+## 14. 后续扩展点
 
 当前设计已经为下列方向留出位置：
 
 - `GradeWidget`
-- `MapMiniWidget`
 - `PowerWidget`
 - `CadenceWidget`
 - 单组件动画配置

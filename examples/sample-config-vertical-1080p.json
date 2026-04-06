@@ -58,6 +58,16 @@
       "unitFontSize": 16
     },
     {
+      "id": "noodlemap-bottom-left",
+      "type": "noodlemap",
+      "enabled": true,
+      "x": 60,
+      "y": 1540,
+      "scale": 0.278,
+      "lineColor": "#ffffff",
+      "lineWeight": "M"
+    },
+    {
       "id": "time-bottom-right",
       "type": "time",
       "enabled": true,

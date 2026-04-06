@@ -12,8 +12,10 @@ import { defaultTheme, mergeThemeWithConfig } from "../theme/default.js";
 import { DistanceWidget } from "../widgets/DistanceWidget.js";
 import { ElevationWidget } from "../widgets/ElevationWidget.js";
 import { HeartRateWidget } from "../widgets/HeartRateWidget.js";
+import { NoodleMapWidget } from "../widgets/NoodleMapWidget.js";
 import { SpeedWidget } from "../widgets/SpeedWidget.js";
 import { TimeWidget } from "../widgets/TimeWidget.js";
+import { hasGpsTrack } from "../widgets/noodleMapShared.js";
 
 const FRAME_DATA_URL = "/frame-data.json";
 
@@ -35,6 +37,10 @@ const renderWidget = (
     return null;
   }
 
+  if (widget.type === "noodlemap" && !hasGpsTrack(frameData.frames)) {
+    return null;
+  }
+
   const isEmpty = frame?.isDataGap ?? false;
   const baseProps = { frame, frameData, theme, isEmpty };
 
@@ -49,6 +55,8 @@ const renderWidget = (
       return <DistanceWidget key={widget.id} {...baseProps} config={widget} />;
     case "time":
       return <TimeWidget key={widget.id} {...baseProps} config={widget} />;
+    case "noodlemap":
+      return <NoodleMapWidget key={widget.id} {...baseProps} config={widget} />;
     default:
       return null;
   }

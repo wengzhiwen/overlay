@@ -108,12 +108,13 @@ output/demo-run/
 - 输出分辨率、帧率、时长策略
 - 输出格式：`mov` 或 `png-sequence`
 - 时间同步参数：offset / trim
-- 五个基础 widget：
+- 六个 widget：
   - `speed`
   - `heart-rate`
   - `elevation`
   - `distance`
   - `time`
+  - `noodlemap`
 - 全局 theme 和每个 widget 的位置、尺寸、基础样式
 
 可直接参考 [examples/sample-config.json](../examples/sample-config.json)。
@@ -127,7 +128,7 @@ output/demo-run/
 - `GPX` / `TCX` 输入
 - 配置加载与 Zod 校验
 - 活动归一化、插值、平滑、逐帧数据生成
-- Remotion 渲染五个基础 widget
+- Remotion 渲染六个 widget，其中包含 GPS 轨迹 noodlemap
 - 透明 `MOV / ProRes 4444` 导出
 - `--sample` 快速预览、`--concurrency` 并行度控制、`--segments` 分段并行渲染
 - 日志、调试产物、元数据输出
@@ -135,6 +136,5 @@ output/demo-run/
 未来目标：
 
 - 更好看的 widgt，虽然这可能是我最不擅长的事情
-- 地图小窗
 - 功率与踏频 widget
 - 一个线上的 demo，让大家可以更容易的get到这个项目到底在做什么

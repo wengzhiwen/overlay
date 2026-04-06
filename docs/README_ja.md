@@ -109,12 +109,13 @@ output/demo-run/
 - 出力解像度、フレームレート、再生時間の設定
 - 出力形式：`mov` または `png-sequence`
 - タイム同期パラメータ：offset / trim
-- 5つの基本ウィジェット：
+- 6つのウィジェット：
   - `speed`
   - `heart-rate`
   - `elevation`
   - `distance`
   - `time`
+  - `noodlemap`
 - グローバルテーマとウィジェットごとの位置、サイズ、スタイル設定
 
 動作例は [examples/sample-config.json](../examples/sample-config.json) を参照してください。
@@ -128,7 +129,7 @@ output/demo-run/
 - `GPX` / `TCX` 入力
 - Zod による設定読み込みとバリデーション
 - アクティビティの正規化、補間、スムージング、フレームデータ生成
-- Remotion による5つの基本ウィジェットのレンダリング
+- Remotion による6つのウィジェットのレンダリング（GPS noodlemap を含む）
 - 透明 `MOV / ProRes 4444` エクスポート
 - `--sample` クイックプレビュー、`--concurrency` 並列制御、`--segments` 並列セグメントレンダリング
 - ログ、デバッグ成果物、メタデータ出力
@@ -136,6 +137,5 @@ output/demo-run/
 今後の予定：
 
 - より見栄えの良いウィジェット（これが一番苦手かもしれません）
-- マップオーバーレイ
 - パワーとケイデンスウィジェット
 - このプロジェクトの概要を手軽に体験できるオンラインデモ

@@ -310,6 +310,10 @@ export const loadActivity = async (filePath: string): Promise<Activity> => {
     warnings.push("Altitude data is missing from the activity file.");
   }
 
+  if (!samples.some((sample) => sample.lat !== undefined && sample.lon !== undefined)) {
+    warnings.push("GPS position data is missing from the activity file.");
+  }
+
   return {
     id: event.name ?? startedAt ?? path.basename(filePath),
     source: {

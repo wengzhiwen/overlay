@@ -10,6 +10,7 @@ export const WidgetTypeSchema = z.enum([
   "elevation",
   "distance",
   "time",
+  "noodlemap",
 ]);
 
 const ZoneSchema = z.object({
@@ -82,12 +83,20 @@ const TimeWidgetSchema = BaseWidgetSchema.extend({
   clockFormat: z.enum(["HH:mm:ss", "HH:mm"]).default("HH:mm:ss"),
 });
 
+const NoodleMapWidgetSchema = BaseWidgetSchema.extend({
+  type: z.literal("noodlemap"),
+  showLabel: z.boolean().default(false),
+  lineColor: z.string().default("#ffffff"),
+  lineWeight: z.enum(["S", "M", "L"]).default("M"),
+});
+
 export const WidgetConfigSchema = z.discriminatedUnion("type", [
   SpeedWidgetSchema,
   HeartRateWidgetSchema,
   ElevationWidgetSchema,
   DistanceWidgetSchema,
   TimeWidgetSchema,
+  NoodleMapWidgetSchema,
 ]);
 
 // Per-widget-type aspect ratios (width / height)
@@ -97,6 +106,7 @@ const WIDGET_ASPECT_RATIOS: Record<string, number> = {
   elevation: 5 / 3,
   distance: 5 / 3,
   time: 2,
+  noodlemap: 5 / 3,
 };
 
 const WIDGET_PADDING_RATIO = 0.07;

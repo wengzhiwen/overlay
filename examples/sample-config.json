@@ -72,6 +72,16 @@
       "scale": 0.188,
       "mode": "both",
       "timezone": "Asia/Singapore"
+    },
+    {
+      "id": "noodlemap-main",
+      "type": "noodlemap",
+      "enabled": true,
+      "x": 1560,
+      "y": 80,
+      "scale": 0.146,
+      "lineColor": "#ffffff",
+      "lineWeight": "M"
     }
   ],
   "debug": {
