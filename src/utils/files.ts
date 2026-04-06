@@ -63,6 +63,15 @@ export const formatLocalTimestamp = (date: Date): string => {
   return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
 };
 
+export const getLocalTimestampedOutputBaseName = (
+  startedAt: string | undefined,
+  fallbackDate = new Date(),
+): string => {
+  const date = startedAt ? new Date(startedAt) : fallbackDate;
+
+  return formatLocalTimestamp(date);
+};
+
 export const createTimestampedOutputDirectory = async (
   rootDirectoryPath: string,
   date = new Date(),
