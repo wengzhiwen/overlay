@@ -19,12 +19,15 @@ const ZoneSchema = z.object({
   color: z.string().min(1),
 });
 
+export const WidgetStyleSchema = z.enum(["with-bgc", "without-bgc"]);
+
 const BaseWidgetSchema = z.object({
   id: z.string().min(1),
   enabled: z.boolean().default(true),
   x: nonNegativeNumber.default(0),
   y: nonNegativeNumber.default(0),
   scale: z.number().finite().min(0.01).max(1).default(0.15),
+  style: WidgetStyleSchema.default("with-bgc"),
   opacity: z.number().finite().min(0).max(1).default(1),
   backgroundColor: z.string().default("rgba(10, 18, 24, 0.55)"),
   borderColor: z.string().default("rgba(255, 255, 255, 0.2)"),
@@ -222,5 +225,6 @@ export const OverlayConfigSchema = z
 
 export type OutputFormat = z.infer<typeof OutputFormatSchema>;
 export type WidgetType = z.infer<typeof WidgetTypeSchema>;
+export type WidgetStyle = z.infer<typeof WidgetStyleSchema>;
 export type OverlayConfig = z.infer<typeof OverlayConfigSchema>;
 export type WidgetConfig = OverlayConfig["widgets"][number];

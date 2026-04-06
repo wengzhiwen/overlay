@@ -33,6 +33,7 @@ describe("noodlemap widget", () => {
     expect(widget.showLabel).toBe(false);
     expect(widget.lineColor).toBe("#ffffff");
     expect(widget.lineWeight).toBe("M");
+    expect(widget.style).toBe("with-bgc");
     expect(widget.width / widget.height).toBeCloseTo(5 / 3, 2);
   });
 

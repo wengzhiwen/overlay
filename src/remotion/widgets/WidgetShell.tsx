@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from "react";
 
 import type { WidgetConfig } from "../../config/schema.js";
 import type { FrameData, FrameSnapshot } from "../../domain/frame-data.js";
+import { getInvertedGlowShadow } from "../../utils/color.js";
 import type { OverlayTheme } from "../theme/default.js";
 
 export type BaseWidgetProps<TConfig extends WidgetConfig> = {
@@ -39,6 +40,9 @@ export const WidgetShell = ({
 }: WidgetShellProps): ReactNode => {
   const isCompactLayout = verticalLayout === "compact";
   const resolvedValueColor = valueColor ?? config.valueColor ?? theme.colors.text;
+  const isWithoutBgc = config.style === "without-bgc";
+  const resolvedLabelColor = config.labelColor ?? theme.colors.secondary;
+  const resolvedUnitColor = config.unitColor ?? theme.colors.secondary;
 
   const containerStyle: CSSProperties = {
     position: "absolute",
@@ -48,9 +52,9 @@ export const WidgetShell = ({
     height: config.height,
     opacity: isEmpty ? config.opacity * 0.3 : config.opacity,
     padding: config.padding,
-    backgroundColor: config.backgroundColor,
-    borderColor: config.borderColor,
-    borderWidth: config.borderWidth,
+    backgroundColor: isWithoutBgc ? "transparent" : config.backgroundColor,
+    borderColor: isWithoutBgc ? "transparent" : config.borderColor,
+    borderWidth: isWithoutBgc ? 0 : config.borderWidth,
     borderStyle: "solid",
     borderRadius: config.borderRadius,
     color: resolvedValueColor,
@@ -60,15 +64,16 @@ export const WidgetShell = ({
     gap: isCompactLayout ? 6 : undefined,
     boxSizing: "border-box",
     fontFamily: config.fontFamily ?? theme.fontFamily,
-    backdropFilter: "blur(10px)",
+    backdropFilter: isWithoutBgc ? undefined : "blur(10px)",
   };
 
   const labelStyle: CSSProperties = {
     fontSize: config.labelFontSize,
-    color: config.labelColor ?? theme.colors.secondary,
+    color: resolvedLabelColor,
     fontWeight: 500,
     letterSpacing: "0.04em",
     textTransform: "uppercase",
+    textShadow: isWithoutBgc ? getInvertedGlowShadow(resolvedLabelColor) : undefined,
   };
 
   const valueRowStyle: CSSProperties = {
@@ -83,13 +88,15 @@ export const WidgetShell = ({
     color: resolvedValueColor,
     fontWeight: 700,
     lineHeight: 1,
+    textShadow: isWithoutBgc ? getInvertedGlowShadow(resolvedValueColor) : undefined,
   };
 
   const unitStyle: CSSProperties = {
     fontSize: config.unitFontSize,
-    color: config.unitColor ?? theme.colors.secondary,
+    color: resolvedUnitColor,
     fontWeight: 500,
     whiteSpace: "nowrap",
+    textShadow: isWithoutBgc ? getInvertedGlowShadow(resolvedUnitColor) : undefined,
   };
 
   const secondaryStyle: CSSProperties = {
@@ -99,6 +106,7 @@ export const WidgetShell = ({
     marginTop: secondaryPlacement === "bottom" ? "auto" : undefined,
     display: "flex",
     alignItems: "flex-end",
+    textShadow: isWithoutBgc ? getInvertedGlowShadow(config.unitColor ?? theme.colors.muted) : undefined,
   };
 
   return (
