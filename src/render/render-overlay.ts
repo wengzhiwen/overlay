@@ -8,12 +8,11 @@ import { bundle } from "@remotion/bundler";
 import {
   renderFrames,
   renderMedia,
-  selectComposition,
 } from "@remotion/renderer";
 
 import { loadOverlayConfig } from "../config/load-config.js";
 import type { OverlayConfig } from "../config/schema.js";
-import type { FrameData } from "../domain/frame-data.js";
+import type { FrameDataMeta } from "../remotion/Root.js";
 import { loadActivity } from "../parsers/activity-loader.js";
 import { buildFrameData } from "../preprocess/build-frame-data.js";
 import { deriveMetrics } from "../preprocess/derive-metrics.js";
@@ -203,19 +202,19 @@ const buildProjectForRender = async (logger: StepLogger): Promise<void> => {
   }
 };
 
-const selectOverlayComposition = async (
-  serveUrl: string,
-  inputProps: {
-    frameData: FrameData;
-    overlayConfig: OverlayConfig;
-  },
-): Promise<Awaited<ReturnType<typeof selectComposition>>> => {
-  return selectComposition({
-    serveUrl,
-    id: "OverlayComposition",
-    inputProps,
-    logLevel: "error",
-  });
+type CompositionSpec = {
+  id: string;
+  width: number;
+  height: number;
+  fps: number;
+  durationInFrames: number;
+  defaultProps: Record<string, unknown>;
+  props: Record<string, unknown>;
+  defaultCodec: null;
+  defaultOutName: null;
+  defaultVideoImageFormat: null;
+  defaultPixelFormat: null;
+  defaultProResProfile: null;
 };
 
 const formatEta = (seconds: number): string => {
@@ -300,13 +299,17 @@ const ffmpegConcat = async (
   }
 };
 
+const FRAME_DATA_FILENAME = "frame-data.json";
+
+type RenderInputProps = {
+  frameDataMeta: FrameDataMeta;
+  overlayConfig: OverlayConfig;
+};
+
 const renderMovSegmented = async (
   serveUrl: string,
-  composition: Awaited<ReturnType<typeof selectComposition>>,
-  inputProps: {
-    frameData: FrameData;
-    overlayConfig: OverlayConfig;
-  },
+  composition: CompositionSpec,
+  inputProps: RenderInputProps,
   targetFilePath: string,
   logger: StepLogger,
   concurrency: number | undefined,
@@ -408,11 +411,8 @@ const renderMovSegmented = async (
 
 const renderMov = async (
   serveUrl: string,
-  composition: Awaited<ReturnType<typeof selectComposition>>,
-  inputProps: {
-    frameData: FrameData;
-    overlayConfig: OverlayConfig;
-  },
+  composition: CompositionSpec,
+  inputProps: RenderInputProps,
   targetFilePath: string,
   logger: StepLogger,
   concurrency?: number | undefined,
@@ -458,11 +458,8 @@ const renderMov = async (
 
 const renderPngSequence = async (
   serveUrl: string,
-  composition: Awaited<ReturnType<typeof selectComposition>>,
-  inputProps: {
-    frameData: FrameData;
-    overlayConfig: OverlayConfig;
-  },
+  composition: CompositionSpec,
+  inputProps: RenderInputProps,
   outputDirectoryPath: string,
   logger: StepLogger,
   concurrency?: number | undefined,
@@ -633,22 +630,54 @@ export const renderOverlay = async (
     },
   );
 
-  const inputProps = {
-    frameData,
+  // Write frame data to serve directory for file-based loading.
+  // Passing 500K+ frames through Chrome script injection causes OOM crashes
+  // because each parallel renderMedia call serializes inputProps via JSON.stringify.
+  await runLoggedStep(
+    "08b-write-frame-data.log",
+    logsDirectoryPath,
+    onProgress,
+    async (logger) => {
+      logger.info("Writing frame data to serve directory for file-based loading.");
+      const filePath = path.join(serveUrl, FRAME_DATA_FILENAME);
+      await writeJsonFile(filePath, frameData.frames);
+      logger.info(
+        `Wrote ${frameData.frames.length} frame(s) to ${FRAME_DATA_FILENAME}.`,
+      );
+    },
+  );
+
+  // Pass lightweight metadata through inputProps; frames are loaded from file.
+  const { frames: _frames, ...frameDataMeta } = frameData;
+  const inputProps: RenderInputProps = {
+    frameDataMeta,
     overlayConfig: config,
   };
 
-  const composition = await runLoggedStep(
+  const composition: CompositionSpec = {
+    id: "OverlayComposition",
+    width: frameData.width,
+    height: frameData.height,
+    fps: frameData.fps,
+    durationInFrames: frameData.durationInFrames,
+    defaultProps: inputProps as unknown as Record<string, unknown>,
+    props: inputProps as unknown as Record<string, unknown>,
+    defaultCodec: null,
+    defaultOutName: null,
+    defaultVideoImageFormat: null,
+    defaultPixelFormat: null,
+    defaultProResProfile: null,
+  };
+
+  await runLoggedStep(
     "09-select-composition.log",
     logsDirectoryPath,
     onProgress,
     async (logger) => {
-      logger.info("Selecting Remotion composition.");
-      const selectedComposition = await selectOverlayComposition(serveUrl, inputProps);
+      logger.info("Constructing composition metadata from frame data (bypassing selectComposition).");
       logger.info(
-        `Composition selected successfully. Duration: ${(selectedComposition.durationInFrames / selectedComposition.fps).toFixed(1)}s (${selectedComposition.durationInFrames} frames).`,
+        `Composition: ${composition.width}x${composition.height} @ ${composition.fps}fps, ${composition.durationInFrames} frames (${(composition.durationInFrames / composition.fps).toFixed(1)}s).`,
       );
-      return selectedComposition;
     },
   );
 

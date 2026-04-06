@@ -2,12 +2,30 @@ import { Composition, getInputProps } from "remotion";
 
 import { defaultOverlayConfig } from "../config/defaults.js";
 import type { OverlayConfig } from "../config/schema.js";
-import type { FrameData } from "../domain/frame-data.js";
+import type { ActivityZone } from "../domain/activity.js";
 import { OverlayComposition } from "./compositions/OverlayComposition.js";
 
+export type FrameDataMeta = {
+  width: number;
+  height: number;
+  fps: number;
+  durationInFrames: number;
+  heartRateZones: ActivityZone[];
+  activityDurationMs: number;
+};
+
 export type RemotionInputProps = {
-  frameData: FrameData;
+  frameDataMeta: FrameDataMeta;
   overlayConfig: OverlayConfig;
+};
+
+const DEFAULT_FRAME_DATA_META: FrameDataMeta = {
+  width: defaultOverlayConfig.render.width,
+  height: defaultOverlayConfig.render.height,
+  fps: defaultOverlayConfig.render.fps,
+  durationInFrames: 1,
+  heartRateZones: [],
+  activityDurationMs: 0,
 };
 
 const getCompositionProps = (): RemotionInputProps => {
@@ -15,36 +33,7 @@ const getCompositionProps = (): RemotionInputProps => {
 
   return {
     overlayConfig: inputProps.overlayConfig ?? defaultOverlayConfig,
-    frameData:
-      inputProps.frameData ??
-      {
-        width: defaultOverlayConfig.render.width,
-        height: defaultOverlayConfig.render.height,
-        fps: defaultOverlayConfig.render.fps,
-        durationInFrames: 1,
-        frames: [
-          {
-            frame: 0,
-            elapsedMs: 0,
-            renderTimeMs: 0,
-            isActive: false,
-            metrics: {
-              speedMps: undefined,
-              heartRateBpm: undefined,
-              altitudeM: undefined,
-              ascentM: undefined,
-              distanceM: undefined,
-              gradePct: undefined,
-              cadenceRpm: undefined,
-              powerW: undefined,
-            },
-            position: undefined,
-            clockTimeIso: undefined,
-          },
-        ],
-        heartRateZones: [],
-        activityDurationMs: 0,
-      },
+    frameDataMeta: inputProps.frameDataMeta ?? DEFAULT_FRAME_DATA_META,
   };
 };
 
@@ -55,10 +44,10 @@ export const Root = () => {
     <Composition
       id="OverlayComposition"
       component={OverlayComposition}
-      width={props.frameData.width}
-      height={props.frameData.height}
-      fps={props.frameData.fps}
-      durationInFrames={props.frameData.durationInFrames}
+      width={props.frameDataMeta.width}
+      height={props.frameDataMeta.height}
+      fps={props.frameDataMeta.fps}
+      durationInFrames={props.frameDataMeta.durationInFrames}
       defaultProps={props}
     />
   );
