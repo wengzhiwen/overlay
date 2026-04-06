@@ -6,6 +6,14 @@ If you use a Garmin watch or bike computer, or upload your activity data to Stra
 
 This project converts GPX or TCX files containing GPS, heart rate, elevation, and other data into a transparent overlay video with a data dashboard. You can then composite this overlay onto your sports video in any video editor (Premiere, DaVinci Resolve, Final Cut Pro — virtually any NLE).
 
+In your video editor, simply layer the overlay video on top of your sports footage:
+
+![Video editor screenshot](docs/video_editor.png)
+
+Output example:
+
+![Output video example](docs/sample1_10s.gif)
+
 It's a lightweight solution — no paid subscriptions, no clunky software you'll only use once.
 
 ## Requirements
