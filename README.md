@@ -10,9 +10,11 @@ In your video editor, simply layer the overlay video on top of your sports foota
 
 ![Video editor screenshot](docs/video_editor.png)
 
-Output example:
+Output examples:
 
-![Output video example](docs/sample1_10s.gif)
+![Output video example - with background color](docs/sample1_10s.gif)
+
+![Output video example - without background color](docs/sample2_10s.gif)
 
 It's a lightweight solution — no paid subscriptions, no clunky software you'll only use once.
 
