@@ -55,7 +55,7 @@ npm run dev -- render \
   --sample
 ```
 
-当前示例配置会输出一个不超过 30 秒、1920x1080、30fps 的透明 `overlay.mov`。
+当前示例配置会输出一个不超过 30 秒、1920x1080、30fps 的透明 MOV。最终文件名会使用该段视频第一秒在系统本地时区下的时间戳，例如 `2026-03-25_17-16-45.mov`。
 
 
 ### CLI 选项
@@ -97,9 +97,9 @@ output/demo-run/
 │  ├─ ...
 │  └─ 11-postprocess.log
 ├─ metadata.json
-└─ overlay.mov
+└─ 2026-03-25_17-16-45.mov
 ```
-如果你只是使用的话，只要找到 `overlay.mov` 就好了。
+如果你只是使用的话，只要找到那个按时间戳命名的 `.mov` 文件就好了。
 
 ## Config Notes
 

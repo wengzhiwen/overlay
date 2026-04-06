@@ -55,7 +55,7 @@ npm run dev -- render \
   --sample
 ```
 
-The sample config produces a transparent `overlay.mov` capped at 30 seconds, 1920x1080, 30fps.
+The sample config produces a transparent MOV capped at 30 seconds, 1920x1080, 30fps. The final filename uses the segment's first second in the system local timezone, for example `2026-03-25_17-16-45.mov`.
 
 
 ### CLI Options
@@ -97,10 +97,10 @@ output/demo-run/
 │  ├─ ...
 │  └─ 11-postprocess.log
 ├─ metadata.json
-└─ overlay.mov
+└─ 2026-03-25_17-16-45.mov
 ```
 
-If you just want the result, grab `overlay.mov`.
+If you just want the result, grab the timestamp-named `.mov` file.
 
 ## Config Notes
 
