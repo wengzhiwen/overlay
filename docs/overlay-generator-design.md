@@ -266,7 +266,7 @@ output/2026-04-06_14-30-00/
 ├─ source/
 │  ├─ activity.gpx
 │  └─ config.json
-├─ overlay.mov
+├─ 2026-04-06_14-30-00.mov
 ├─ metadata.json
 ├─ debug/
 │  ├─ activity.normalized.json
@@ -291,17 +291,17 @@ output/2026-04-06_14-30-00/
 
 ```text
 output/2026-04-06_14-30-00/          ← 第一段（14:30 出发）
-├─ overlay.mov
+├─ 2026-04-06_14-30-00.mov
 ├─ metadata.json
 └─ logs/...
 output/2026-04-06_15-00-00/          ← 第二段（15:00 恢复）
-├─ overlay.mov
+├─ 2026-04-06_15-00-00.mov
 ├─ metadata.json
 └─ logs/...
 ```
 
 - 无长空窗时行为与单段一致
-- 目录名使用系统本地时区（非 UTC）
+- 目录名和最终视频文件名都使用系统本地时区（非 UTC）
 - 若活动无 `startedAt`，退化为当前渲染时间命名
 
 ## 10. 统一领域模型设计
