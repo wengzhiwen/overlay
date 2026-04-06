@@ -88,7 +88,7 @@ export const WidgetConfigSchema = z.discriminatedUnion("type", [
 // Per-widget-type aspect ratios (width / height)
 const WIDGET_ASPECT_RATIOS: Record<string, number> = {
   speed: 5 / 3,
-  "heart-rate": 7 / 6,
+  "heart-rate": 5 / 3,
   elevation: 5 / 3,
   distance: 5 / 3,
   time: 2,

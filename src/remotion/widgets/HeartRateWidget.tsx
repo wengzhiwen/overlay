@@ -42,8 +42,8 @@ const shouldShowChart = (
   return totalDurationMs > 60_000;
 };
 
-// Chart occupies ~35% of usable widget height
-const CHART_HEIGHT_RATIO = 0.35;
+// Keep the chart visually substantial while letting it sit closer to the bottom edge.
+const CHART_HEIGHT_RATIO = 0.46;
 
 export const HeartRateWidget = ({
   frame,
@@ -84,6 +84,8 @@ export const HeartRateWidget = ({
       unit={config.showUnit ? "bpm" : undefined}
       secondary={chartElement}
       valueColor={getZoneColor(frame.metrics.heartRateBpm, config)}
+      verticalLayout="compact"
+      secondaryPlacement="bottom"
       isEmpty={isEmpty}
     />
   );

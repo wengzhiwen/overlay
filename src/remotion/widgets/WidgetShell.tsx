@@ -21,6 +21,8 @@ type WidgetShellProps = {
   secondary: ReactNode | undefined;
   isEmpty?: boolean | undefined;
   valueColor: string | undefined;
+  verticalLayout?: "spread" | "compact";
+  secondaryPlacement?: "flow" | "bottom";
 };
 
 export const WidgetShell = ({
@@ -32,8 +34,12 @@ export const WidgetShell = ({
   secondary,
   isEmpty = false,
   valueColor: _valueColor,
+  verticalLayout = "spread",
+  secondaryPlacement = "flow",
 }: WidgetShellProps): ReactNode => {
   void _valueColor;
+  const isCompactLayout = verticalLayout === "compact";
+
   const containerStyle: CSSProperties = {
     position: "absolute",
     left: config.x,
@@ -50,7 +56,8 @@ export const WidgetShell = ({
     color: config.valueColor ?? theme.colors.text,
     display: "flex",
     flexDirection: "column",
-    justifyContent: "space-between",
+    justifyContent: isCompactLayout ? "flex-start" : "space-between",
+    gap: isCompactLayout ? 6 : undefined,
     boxSizing: "border-box",
     fontFamily: config.fontFamily ?? theme.fontFamily,
     backdropFilter: "blur(10px)",
@@ -89,6 +96,9 @@ export const WidgetShell = ({
     fontSize: config.unitFontSize,
     color: config.unitColor ?? theme.colors.muted,
     fontWeight: 500,
+    marginTop: secondaryPlacement === "bottom" ? "auto" : undefined,
+    display: "flex",
+    alignItems: "flex-end",
   };
 
   return (
