@@ -1,6 +1,6 @@
 # 运动数据 Overlay 生成器
 
-组件设计文档 v0.2
+组件设计文档 v0.3
 
 本文档覆盖 MVP 组件设计，包括组件边界、输入输出、配置结构和通用骨架。
 
@@ -26,6 +26,7 @@ type BaseWidgetProps<TConfig extends WidgetConfig> = {
   frameData: FrameData;
   config: TConfig;
   theme: OverlayTheme;
+  isEmpty: boolean;
 };
 ```
 
@@ -85,6 +86,7 @@ type WidgetShellProps = {
   value: string;
   unit: string | undefined;
   secondary: ReactNode | undefined;
+  isEmpty?: boolean | undefined;   // 空态标记，true 时整体透明度降至 0.3x
   valueColor: string | undefined;
 };
 ```
@@ -172,12 +174,32 @@ type OverlayTheme = {
 
 ## 6. 缺失数据策略
 
+### 6.1 常规缺失
+
 统一策略：
 
 - 当前字段缺失时显示 `--`
 - 缺失不影响其他组件继续渲染
 - `metadata.json` 中记录出现过的关键字段缺失告警（通过 `activity.warnings`）
 - 不因为单个 widget 数据为空而整次渲染失败
+
+### 6.2 数据空窗（Data Gap）
+
+当活动数据中出现暂停（自动暂停或手动暂停）导致的空窗时：
+
+- **空窗检测**：相邻样本 `elapsedMs` 间隔 > 20s 视为空窗
+- **短空窗（20-120s）**：空窗期间插入空样本，`FrameSnapshot.isDataGap = true`
+- **长空窗（>120s）**：视频截断为多段，每段独立渲染
+
+空窗期间的 Widget 行为：
+
+- 所有 Widget（除 TimeWidget）进入**空态**：
+  - `WidgetShell` 的 `isEmpty` prop 为 `true`
+  - 容器透明度降至正常值的 30%（`opacity = config.opacity * 0.3`）
+  - 数值区域显示 `--`
+- **TimeWidget 不受影响**：始终正常显示用时和时钟
+- **HeartRateChart**：空窗期间跳过柱状图绘制（已有 undefined 跳过逻辑）
+- **ElevationWidget**：累计爬升显示最后一次有效值（空窗期间无累计变化）
 
 ## 7. SpeedWidget
 

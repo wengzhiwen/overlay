@@ -1,6 +1,6 @@
 # 运动数据 Overlay 生成器
 
-设计文档 v0.2
+设计文档 v0.3
 
 ## 1. 文档目的
 
@@ -80,9 +80,11 @@ GPX / TCX 文件
     ↓
 预处理层
 - 时间轴归一化
+- 空窗检测与分段
 - 指标抽取与派生
-- 插值
-- 平滑
+- 插值（空窗边界不插值）
+- 平滑（窗口不跨越空窗）
+- 短空窗填充
 - 逐帧数据生成（1Hz snapshot）
     ↓
 Remotion Composition
@@ -164,11 +166,14 @@ project-root/
 │  │  ├─ metrics.ts                  # ActivityMetrics
 │  │  └─ frame-data.ts              # FrameData、FrameSnapshot、索引查询
 │  ├─ preprocess/
-│  │  ├─ normalize.ts               # 时间轴归一化
-│  │  ├─ derive-metrics.ts          # 派生指标（坡度、累计爬升）
-│  │  ├─ interpolate.ts             # 缺失样本插值
-│  │  ├─ smooth.ts                  # 平滑（速度、心率、海拔、坡度）
-│  │  └─ build-frame-data.ts        # 逐帧 snapshot 生成
+│  │  ├─ normalize.ts               # 时间轴归一化（保留真实时间间隔）
+│  │  ├─ detect-gaps.ts             # 空窗检测与分类（20s/120s 阈值）
+│  │  ├─ split-activity.ts          # 长空窗分段
+│  │  ├─ fill-gaps.ts               # 短空窗填充
+│  │  ├─ derive-metrics.ts          # 派生指标（坡度、累计爬升，空窗边界跳过）
+│  │  ├─ interpolate.ts             # 缺失样本插值（空窗区域不插值）
+│  │  ├─ smooth.ts                  # 平滑（窗口不跨越空窗边界）
+│  │  └─ build-frame-data.ts        # 逐帧 snapshot 生成（传播 isDataGap）
 │  ├─ config/
 │  │  ├─ schema.ts                  # Zod schema + widget 维度推导
 │  │  ├─ load-config.ts             # 配置加载（JSON/YAML）
@@ -223,39 +228,41 @@ project-root/
 实际管线步骤如下（每步一个独立日志文件）：
 
 1. `01-load-config` — 加载并校验配置
-2. `02-load-activity` — 解析活动文件
-3. `03-normalize-activity` — 时间轴归一化
-4. `04-derive-metrics` — 派生指标（坡度、累计爬升）
-5. `05-interpolate-and-smooth` — 插值 + 平滑（合并为一步）
-6. `06-build-frame-data` — 构建 1Hz snapshot 序列
-7. `07-build-project` — TypeScript 编译
-8. `08-bundle-remotion` — Remotion bundle
-9. `08b-write-frame-data` — 将帧数据写入 serve 目录
-10. `09-select-composition` — 构建 composition 元信息
-11. `10-render-overlay` — 渲染输出（PNG snapshot → FFmpeg 编码）
-12. `11-postprocess` — 后处理（当前为空操作）
+2. `02-load-activity` — 解析活动文件（含真实时间戳提取）
+3. `03-normalize-activity` — 时间轴归一化（保留真实时间间隔）
+4. `04-detect-gaps` — 空窗检测与分类（短空窗 20-120s / 长空窗 >120s）
+5. 长空窗分段（拆分为独立 Activity）— 无日志步骤
+6. **对每段循环** 步骤 7-14：
+7. `05-derive-metrics` — 派生指标（空窗边界跳过 delta 计算）
+8. `06-interpolate-and-smooth` — 插值（空窗区域不插值）+ 平滑（窗口不跨越空窗）
+9. 短空窗填充 + 重索引 — 无日志步骤
+10. `07-build-frame-data` — 构建 1Hz snapshot 序列（传播 `isDataGap`）
+11. `08-build-project` — TypeScript 编译（仅一次）
+12. `09-bundle-remotion` — Remotion bundle（仅一次）
+13. `09b-write-frame-data` — 将帧数据写入 serve 目录
+14. `10-render-overlay` — 渲染输出（PNG snapshot → FFmpeg 编码）
+15. `11-postprocess` — 后处理（当前为空操作）
+
+说明：
+
+- 步骤 4-5 在第一个段和后续段之间执行一次空窗检测和分段
+- 步骤 8-9（build project / bundle Remotion）仅在首次执行，后续段共享
+- 每段输出到独立目录，使用活动起始时间的本地时区格式命名
 
 ### 9.3 输出
 
-每次运行默认输出到：
+每次运行默认输出到以活动起始时间（本地时区）命名的目录：
 
 ```text
-output/<timestamp>/
+output/<YYYY-MM-DD_HH-mm-ss>/
 ```
 
-至少包含：
+若存在长空窗（>120s），活动被拆分为多段，每段输出到独立目录，均以各自起始时间命名。
 
-- 原始源文件副本：`source/`
-- `overlay.mov` 或 `frames/`（PNG 序列）
-- `metadata.json`
-- `debug/frame-data.json`
-- `debug/activity.normalized.json`
-- `logs/*.log`
-
-实际输出结构：
+单段输出结构：
 
 ```text
-output/2026-04-05T13-30-00Z/
+output/2026-04-06_14-30-00/
 ├─ source/
 │  ├─ activity.gpx
 │  └─ config.json
@@ -268,16 +275,34 @@ output/2026-04-05T13-30-00Z/
    ├─ 01-load-config.log
    ├─ 02-load-activity.log
    ├─ 03-normalize-activity.log
-   ├─ 04-derive-metrics.log
-   ├─ 05-interpolate-and-smooth.log
-   ├─ 06-build-frame-data.log
-   ├─ 07-build-project.log
-   ├─ 08-bundle-remotion.log
-   ├─ 08b-write-frame-data.log
+   ├─ 04-detect-gaps.log
+   ├─ 05-derive-metrics.log
+   ├─ 06-interpolate-and-smooth.log
+   ├─ 07-build-frame-data.log
+   ├─ 08-build-project.log
+   ├─ 08b-bundle-remotion.log
+   ├─ 08c-write-frame-data.log
    ├─ 09-select-composition.log
    ├─ 10-render-overlay.log
    └─ 11-postprocess.log
 ```
+
+多段输出（长空窗分段时）：
+
+```text
+output/2026-04-06_14-30-00/          ← 第一段（14:30 出发）
+├─ overlay.mov
+├─ metadata.json
+└─ logs/...
+output/2026-04-06_15-00-00/          ← 第二段（15:00 恢复）
+├─ overlay.mov
+├─ metadata.json
+└─ logs/...
+```
+
+- 无长空窗时行为与单段一致
+- 目录名使用系统本地时区（非 UTC）
+- 若活动无 `startedAt`，退化为当前渲染时间命名
 
 ## 10. 统一领域模型设计
 
@@ -293,6 +318,14 @@ output/2026-04-05T13-30-00Z/
 
 ```ts
 type ActivitySourceFormat = "gpx" | "tcx";
+
+type DataGap = {
+  afterIndex: number;    // 空窗前最后一个样本的索引
+  beforeIndex: number;   // 空窗后第一个样本的索引
+  startMs: number;       // 空窗起始 elapsedMs
+  endMs: number;         // 空窗结束 elapsedMs
+  durationMs: number;    // 空窗持续时间
+};
 
 type ActivityZone = {
   min: number | undefined;
@@ -314,6 +347,7 @@ type ActivitySample = {
   gradePct: number | undefined;
   cadenceRpm: number | undefined;
   powerW: number | undefined;
+  isDataGap?: boolean;          // 短空窗填充的空样本标记
 };
 
 type Activity = {
@@ -335,12 +369,16 @@ type Activity = {
     ascentM: number | undefined;
   };
   samples: ActivitySample[];
+  gaps: DataGap[];
 };
 ```
 
 设计约束：
 
-- `elapsedMs` 必须存在，作为后续所有插值与逐帧采样的基准
+- `elapsedMs` 基于源文件真实时间戳计算，反映实际时间间隔（含空窗跳跃）
+- 归一化步骤不再将 `elapsedMs` 重索引为 `index * 1000`，保留真实时间间隔信息
+- 空窗（≥20s）在 `gaps` 数组中记录，按时长分为短空窗（20-120s）和长空窗（>120s）
+- `isDataGap` 标记短空窗填充时插入的空样本（所有指标为 undefined）
 - 所有单位在内部统一
 - 缺失字段为 `undefined`，不伪造不存在的数据
 - `warnings` 收集解析和预处理过程中的告警信息
@@ -378,6 +416,45 @@ type ActivityMetrics = {
 
 目标：
 
+- 把原始采样点按 `elapsedMs` 排序，去重，保留真实时间间隔
+- 不再重索引为 `index * 1000`，保留空窗跳跃信息
+- `elapsedMs` 基于源文件真实时间戳计算（`realTimestampMs - startedAtMs`），反映实际时间流逝
+- 当源文件无真实时间戳时退化为 `index * 1000`
+
+### 11.2 空窗检测
+
+活动数据中的"空窗"指设备暂停（自动暂停或手动暂停）导致的时间跳跃。GPS 信号丢失不会造成空窗（打点仍然存在）。
+
+检测阈值：
+
+- **空窗判定**：相邻样本 `elapsedMs` 差值 - 1000ms > 20,000ms（20 秒）
+- **短空窗**：20s < 空窗时长 ≤ 120s → 填充空帧，Widget 显示空态
+- **长空窗**：空窗时长 > 120s → 视频分段截断
+
+检测算法扫描归一化后的 samples 数组，找出所有 `elapsedMs` 跳跃 > 20s 的位置，记录到 `Activity.gaps` 数组。
+
+### 11.3 长空窗分段
+
+对于超过 120 秒的长空窗，将 Activity 在空窗处拆分为独立子活动：
+
+- 每个子活动的 `samples` 是原始数组的一个连续切片
+- 每个子活动的 `elapsedMs` 从 0 重新索引
+- 每个子活动的 `startedAt` 基于其第一个样本的真实 `timestampMs` 重新计算
+- 每个子活动保留自己范围内的短空窗信息
+- 每个子活动独立走后续预处理和渲染管线，输出独立视频文件
+
+### 11.4 短空窗填充
+
+对于 20-120 秒的短空窗，在空窗区域插入空样本：
+
+- 空样本所有指标为 `undefined`，标记 `isDataGap: true`
+- 插入后重索引 `elapsedMs` 为连续 1 秒间隔
+- 填充后的 sample 序列可直接用于逐帧映射（`elapsedMs / 1000` = sample index）
+
+### 11.5 指标抽取与派生
+
+目标：
+
 - 把原始采样点统一到以 `elapsedMs` 为基准的时间轴
 - 处理缺失起始时间、时间不连续、重复点等问题
 - 生成稳定、单调递增的样本序列
@@ -402,7 +479,7 @@ type ActivityMetrics = {
 - 原始文件中没有的数据不强行生成
 - 合理派生允许存在，但必须在 `metadata.json` 里记录来源和方法
 
-### 11.3 插值
+### 11.6 插值
 
 插值的目标不是"生成更真实的新数据"，而是让按帧渲染时有稳定值可读。
 
@@ -412,8 +489,9 @@ type ActivityMetrics = {
 - 对连续数值型指标使用线性插值
 - 对坐标也可线性插值，用于后续小地图轨迹动画
 - 对明显离散或分类值不做插值
+- **空窗区域不插值**：标记为 `isDataGap` 的样本跳过插值，且插值搜索边界不跨越空窗
 
-### 11.4 平滑
+### 11.7 平滑
 
 平滑主要用于降低 GPS 漂移、速度抖动、海拔噪声造成的视觉跳动。
 
@@ -426,7 +504,11 @@ type ActivityMetrics = {
 
 所有窗口均可配置，范围 1–15 秒。默认值保守，避免过度修饰原始数据。
 
-### 11.5 逐帧数据生成
+空窗约束：
+
+- **平滑窗口不跨越空窗边界**：移动平均窗口内的空窗样本（`isDataGap: true`）被排除，防止空窗两侧的数据互相污染
+
+### 11.8 逐帧数据生成
 
 `frameData` 是 Remotion 的直接输入。生成策略为固定 1Hz snapshot（`SNAPSHOT_INTERVAL_MS = 1000`），每个 snapshot 对应 1 秒的活动数据。
 
@@ -447,6 +529,7 @@ type FrameSnapshot = {
   elapsedMs: number;
   renderTimeMs: number;
   isActive: boolean;
+  isDataGap: boolean;
   metrics: ActivityMetrics;
   position:
     | {
@@ -462,6 +545,7 @@ type FrameSnapshot = {
 
 - `renderTimeMs`：渲染时间轴上的时间，受 `activityOffsetMs` 偏移影响
 - `isActive`：当前帧是否处于活动有效时段内
+- `isDataGap`：当前帧是否处于短空窗区域（空窗填充产生的空帧），Widget 据此渲染空态
 - `snapshotIntervalMs`：固定 1000ms，snapshot 与 render frame 之间的映射由 `getSnapshotForRenderFrame` 计算
 - `heartRateZones`：心率区间数据，从 Activity 传递到 HeartRateWidget
 - `activityDurationMs`：活动原始时长
@@ -609,15 +693,30 @@ Composition 只接收以下内容：
 ```text
 CLI
   → load config
-  → parse activity
-  → preprocess activity
-  → build frameData
-  → build project (tsc)
-  → bundle Remotion
-  → write frame-data.json to serve dir
-  → render low-fps PNG snapshots via Remotion (everyNthFrame)
-  → encode to MOV via FFmpeg (ProRes 4444)
+  → parse activity（含真实时间戳提取）
+  → normalize activity（保留真实时间间隔）
+  → detect gaps（空窗检测与分类）
+  → split at long gaps（长空窗分段，无长空窗时返回单个 Activity）
+  → [for each segment]:
+      → derive metrics（空窗边界跳过 delta）
+      → interpolate & smooth（空窗区域不处理）
+      → fill short gaps（插入空样本，重索引为连续 1s）
+      → build frameData
+      → write frame-data.json to serve dir
+      → render low-fps PNG snapshots via Remotion (everyNthFrame)
+      → encode to MOV via FFmpeg (ProRes 4444)
+      → write metadata.json
+  → [shared once]:
+      → build project (tsc)
+      → bundle Remotion
 ```
+
+多段渲染约束：
+
+- build project 和 bundle Remotion 仅执行一次，所有段共享
+- 每段的 frame-data.json 写入同一 serve 目录，渲染完成后下一段覆盖
+- 每段输出到独立目录，以活动起始时间（本地时区）命名
+- 已有的 `--segments` 分段并行渲染功能在各段内部仍然可用
 
 ### 14.2 低频快照渲染策略
 

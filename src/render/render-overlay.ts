@@ -530,6 +530,9 @@ const renderMovSegmented = async (
   const previousMaxListeners = process.getMaxListeners();
   process.setMaxListeners(previousMaxListeners + ranges.length);
 
+  let completedSegments = 0;
+  const encodeStartTime = Date.now();
+
   try {
     const results = await Promise.allSettled(
       ranges.map(async ([startFrame, endFrame], index) => {
@@ -570,6 +573,15 @@ const renderMovSegmented = async (
               proresProfile,
               logger,
             )
+          );
+          completedSegments++;
+          const progress = completedSegments / ranges.length;
+          const elapsedMs = Date.now() - encodeStartTime;
+          const eta = progress > 0
+            ? formatEta((elapsedMs / progress - elapsedMs) / 1000)
+            : "--";
+          logger.info(
+            `Encoding progress: segment ${completedSegments}/${ranges.length} | ETA ${eta}`,
           );
         } finally {
           await rm(segmentPngDirectoryPath, { recursive: true, force: true });
