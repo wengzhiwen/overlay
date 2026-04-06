@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 
-import type { FrameData } from "../../domain/frame-data.js";
+import { getSnapshotForElapsedMs, type FrameData } from "../../domain/frame-data.js";
 
 type ZoneInput = {
   min?: number | undefined;
@@ -73,9 +73,7 @@ const sampleHeartRate = (
   frameData: FrameData,
   elapsedMs: number,
 ): number | undefined => {
-  const frameIndex = Math.floor((elapsedMs / 1000) * frameData.fps);
-  const clampedIndex = Math.min(frameIndex, frameData.frames.length - 1);
-  return frameData.frames[clampedIndex]?.metrics.heartRateBpm;
+  return getSnapshotForElapsedMs(frameData, elapsedMs)?.metrics.heartRateBpm;
 };
 
 type HeartRateChartProps = {

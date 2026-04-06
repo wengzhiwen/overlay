@@ -1,17 +1,15 @@
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { createWriteStream } from "node:fs";
-import { rm, writeFile } from "node:fs/promises";
+import { access, readdir, rm, writeFile } from "node:fs/promises";
 import { promisify } from "node:util";
 
 import { bundle } from "@remotion/bundler";
-import {
-  renderFrames,
-  renderMedia,
-} from "@remotion/renderer";
+import { renderFrames } from "@remotion/renderer";
 
 import { loadOverlayConfig } from "../config/load-config.js";
 import type { OverlayConfig } from "../config/schema.js";
+import { SNAPSHOT_INTERVAL_MS } from "../domain/frame-data.js";
 import type { FrameDataMeta } from "../remotion/Root.js";
 import { loadActivity } from "../parsers/activity-loader.js";
 import { buildFrameData } from "../preprocess/build-frame-data.js";
@@ -56,6 +54,7 @@ type RenderMetadata = {
     height: number;
     fps: number;
     durationInFrames: number;
+    snapshotIntervalMs: number;
     outputFormat: string;
     sampleMaxDurationMs: number | undefined;
   };
@@ -84,8 +83,13 @@ const createStepLogger = (
   close: () => Promise<void>;
 } => {
   const stream = createWriteStream(filePath, { flags: "a" });
+  let closed = false;
 
   const push = (level: "INFO" | "WARN" | "ERROR", message: string) => {
+    if (closed || stream.destroyed || stream.writableEnded) {
+      return;
+    }
+
     const line = `[${new Date().toISOString()}] [${level}] ${message}`;
     stream.write(`${line}\n`);
     emitProgress(line);
@@ -98,6 +102,7 @@ const createStepLogger = (
       error: (message) => push("ERROR", message),
     },
     close: async () => {
+      closed = true;
       await new Promise<void>((resolve, reject) => {
         stream.end((error?: Error | null) => {
           if (error) {
@@ -230,13 +235,144 @@ const formatEta = (seconds: number): string => {
 };
 
 const MIN_SEGMENT_SECONDS = 10;
+const MAX_PARALLEL_ENCODERS = 2;
 
 type FrameRange = [number, number];
+
+const PRORES_PROFILE_TO_FFMPEG_PROFILE: Record<OverlayConfig["render"]["output"]["proresProfile"], string> = {
+  "4444": "4",
+  "4444-xq": "5",
+};
+
+let cachedFfmpegExecutablePath: string | undefined;
+
+const resolveFfmpegExecutablePath = async (): Promise<string> => {
+  if (cachedFfmpegExecutablePath) {
+    return cachedFfmpegExecutablePath;
+  }
+
+  try {
+    await execFileAsync("ffmpeg", ["-version"], {
+      maxBuffer: 1024 * 1024 * 5,
+    });
+    cachedFfmpegExecutablePath = "ffmpeg";
+    return cachedFfmpegExecutablePath;
+  } catch {
+    // Fall back to bundled ffmpeg binaries below.
+  }
+
+  const remotionRoot = path.join(process.cwd(), "node_modules", "@remotion");
+
+  try {
+    const packages = await readdir(remotionRoot);
+
+    for (const packageName of packages) {
+      if (!packageName.startsWith("compositor-")) {
+        continue;
+      }
+
+      for (const binaryName of ["ffmpeg", "ffmpeg.exe"]) {
+        const candidatePath = path.join(remotionRoot, packageName, binaryName);
+
+        try {
+          await access(candidatePath);
+          cachedFfmpegExecutablePath = candidatePath;
+          return candidatePath;
+        } catch {
+          // Try the next bundled binary candidate.
+        }
+      }
+    }
+  } catch {
+    // Fall back to a system ffmpeg below.
+  }
+
+  cachedFfmpegExecutablePath = "ffmpeg";
+  return cachedFfmpegExecutablePath;
+};
+
+const getFfmpegEnv = (ffmpegExecutablePath: string): NodeJS.ProcessEnv => {
+  if (ffmpegExecutablePath === "ffmpeg") {
+    return process.env;
+  }
+
+  const libraryDirectoryPath = path.dirname(ffmpegExecutablePath);
+
+  return {
+    ...process.env,
+    DYLD_LIBRARY_PATH: process.env.DYLD_LIBRARY_PATH
+      ? `${libraryDirectoryPath}:${process.env.DYLD_LIBRARY_PATH}`
+      : libraryDirectoryPath,
+    LD_LIBRARY_PATH: process.env.LD_LIBRARY_PATH
+      ? `${libraryDirectoryPath}:${process.env.LD_LIBRARY_PATH}`
+      : libraryDirectoryPath,
+  };
+};
+
+const getSnapshotRenderStep = (
+  composition: Pick<CompositionSpec, "fps">,
+  snapshotIntervalMs: number,
+): number => {
+  return Math.max(1, Math.round((snapshotIntervalMs / 1000) * composition.fps));
+};
+
+const getRenderableFrameCount = (
+  frameRange: FrameRange,
+  everyNthFrame: number,
+): number => {
+  const [startFrame, endFrame] = frameRange;
+  const firstRenderableFrame =
+    Math.ceil(startFrame / everyNthFrame) * everyNthFrame;
+
+  if (firstRenderableFrame > endFrame) {
+    return 0;
+  }
+
+  return Math.floor((endFrame - firstRenderableFrame) / everyNthFrame) + 1;
+};
+
+const createConcurrencyLimiter = (limit: number) => {
+  let activeCount = 0;
+  const queue: Array<() => void> = [];
+
+  const scheduleNext = () => {
+    if (activeCount >= limit) {
+      return;
+    }
+
+    const next = queue.shift();
+
+    if (!next) {
+      return;
+    }
+
+    activeCount += 1;
+    next();
+  };
+
+  return async <T>(task: () => Promise<T>): Promise<T> => {
+    if (activeCount >= limit) {
+      await new Promise<void>((resolve) => {
+        queue.push(resolve);
+      });
+    } else {
+      activeCount += 1;
+    }
+
+    try {
+      return await task();
+    } finally {
+      activeCount -= 1;
+      scheduleNext();
+    }
+  };
+};
 
 const calculateSegments = (
   requestedSegments: number,
   totalFrames: number,
   fps: number,
+  snapshotIntervalMs: number,
 ): FrameRange[] => {
   const totalSeconds = Math.floor(totalFrames / fps);
   const maxSegments = Math.max(1, Math.floor(totalSeconds / MIN_SEGMENT_SECONDS));
@@ -246,30 +382,35 @@ const calculateSegments = (
     return [[0, totalFrames - 1]];
   }
 
-  const secondsPerSegment = Math.floor(totalSeconds / actualSegments);
-  const framesPerSegment = secondsPerSegment * Math.round(fps);
+  const frameStep = getSnapshotRenderStep({ fps }, snapshotIntervalMs);
+  const totalSnapshots = Math.max(1, Math.ceil(totalFrames / frameStep));
+  const baseSnapshotsPerSegment = Math.floor(totalSnapshots / actualSegments);
+  const remainderSnapshots = totalSnapshots % actualSegments;
   const ranges: FrameRange[] = [];
+  let nextSnapshotIndex = 0;
 
-  for (let i = 0; i < actualSegments; i++) {
-    const start = i * framesPerSegment;
-    const end = i === actualSegments - 1
-      ? totalFrames - 1
-      : (i + 1) * framesPerSegment - 1;
-    if (start <= end) {
-      ranges.push([start, end]);
+  for (let index = 0; index < actualSegments; index += 1) {
+    const snapshotCount =
+      baseSnapshotsPerSegment + (index < remainderSnapshots ? 1 : 0);
+
+    if (snapshotCount <= 0) {
+      continue;
     }
+
+    const startFrame = nextSnapshotIndex * frameStep;
+    const endFrame = Math.min(
+      totalFrames - 1,
+      (nextSnapshotIndex + snapshotCount - 1) * frameStep,
+    );
+
+    if (startFrame <= endFrame) {
+      ranges.push([startFrame, endFrame]);
+    }
+
+    nextSnapshotIndex += snapshotCount;
   }
 
   return ranges;
-};
-
-const checkFfmpegAvailable = async (): Promise<boolean> => {
-  try {
-    await execFileAsync("ffmpeg", ["-version"]);
-    return true;
-  } catch {
-    return false;
-  }
 };
 
 const ffmpegConcat = async (
@@ -277,23 +418,38 @@ const ffmpegConcat = async (
   outputPath: string,
   logger: StepLogger,
 ): Promise<void> => {
+  const ffmpegExecutablePath = await resolveFfmpegExecutablePath();
   const concatListPath = path.join(path.dirname(outputPath), "concat.txt");
   const concatContent = segmentPaths
-    .map((p) => `file '${p.replace(/'/g, "'\\''")}'`)
+    .map((segmentPath) => `file '${segmentPath.replace(/'/g, "'\\''")}'`)
     .join("\n");
-  await writeFile(concatListPath, concatContent, "utf8");
 
-  logger.info(`Concatenating ${segmentPaths.length} segment(s) with FFmpeg.`);
+  await writeFile(concatListPath, concatContent, "utf8");
+  logger.info(`Concatenating ${segmentPaths.length} segment(s) with ${path.basename(ffmpegExecutablePath)}.`);
 
   try {
-    await execFileAsync("ffmpeg", [
-      "-f", "concat",
-      "-safe", "0",
-      "-i", concatListPath,
-      "-c", "copy",
-      "-y",
-      outputPath,
-    ], { timeout: 300_000 });
+    await execFileAsync(
+      ffmpegExecutablePath,
+      [
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-f",
+        "concat",
+        "-safe",
+        "0",
+        "-i",
+        concatListPath,
+        "-c",
+        "copy",
+        "-y",
+        outputPath,
+      ],
+      {
+        env: getFfmpegEnv(ffmpegExecutablePath),
+        maxBuffer: 1024 * 1024 * 20,
+      },
+    );
   } finally {
     await rm(concatListPath, { force: true });
   }
@@ -314,99 +470,177 @@ const renderMovSegmented = async (
   logger: StepLogger,
   concurrency: number | undefined,
   segments: number,
+  proresProfile: OverlayConfig["render"]["output"]["proresProfile"],
+  snapshotIntervalMs: number,
 ): Promise<void> => {
   const totalFrames = composition.durationInFrames;
-  const ranges = calculateSegments(segments, totalFrames, composition.fps);
+  const ranges = calculateSegments(
+    segments,
+    totalFrames,
+    composition.fps,
+    snapshotIntervalMs,
+  );
 
   if (ranges.length <= 1) {
     logger.info(
       `Requested ${segments} segment(s) but duration too short. Falling back to single render.`,
     );
-    await renderMov(serveUrl, composition, inputProps, targetFilePath, logger, concurrency);
+    await renderMov(
+      serveUrl,
+      composition,
+      inputProps,
+      targetFilePath,
+      logger,
+      concurrency,
+      proresProfile,
+      snapshotIntervalMs,
+    );
     return;
   }
 
   logger.info(
-    `Rendering ${ranges.length} segment(s) in parallel. Total: ${totalFrames} frames at ${composition.fps}fps.`,
+    `Rendering ${ranges.length} low-frequency segment(s) in parallel. Total: ${totalFrames} frames at ${composition.fps}fps.`,
   );
 
-  // Each renderMedia registers signal handlers; raise limit to avoid warnings and premature kills
-  process.setMaxListeners(process.getMaxListeners() + ranges.length);
-
-  const segmentsDir = path.join(path.dirname(targetFilePath), "segments");
+  const segmentsDir = path.join(path.dirname(targetFilePath), ".remotion-segments");
   await ensureDirectoryPath(segmentsDir);
 
-  const segmentPaths = ranges.map(
-    (_, i) => path.join(segmentsDir, `seg_${String(i).padStart(3, "0")}.mov`),
+  const segmentPaths = ranges.map((_, index) =>
+    path.join(segmentsDir, `seg_${String(index).padStart(3, "0")}.mov`),
   );
 
-  // Render all segments in parallel
   const perSegmentConcurrency = concurrency
     ? Math.max(1, Math.floor(concurrency / ranges.length))
     : null;
+  const encodeConcurrency = Math.max(
+    1,
+    Math.min(MAX_PARALLEL_ENCODERS, ranges.length),
+  );
+  const runEncode = createConcurrencyLimiter(encodeConcurrency);
   logger.info(
     `Per-segment concurrency: ${perSegmentConcurrency ?? "auto"} (${ranges.length} segment(s)).`,
   );
+  logger.info(`FFmpeg encode concurrency: ${encodeConcurrency}.`);
 
-  const startedAt = Date.now();
-  await Promise.all(
-    ranges.map(([start, end], i) => {
-      const durationSec = ((end - start + 1) / composition.fps).toFixed(1);
-      logger.info(
-        `Segment ${i}: frames ${start}–${end} (${durationSec}s) → ${path.basename(segmentPaths[i]!)}`,
-      );
+  const previousMaxListeners = process.getMaxListeners();
+  process.setMaxListeners(previousMaxListeners + ranges.length);
 
-      let lastBucket = -1;
-      return renderMedia({
-        serveUrl,
-        composition,
-        inputProps,
-        codec: "prores",
-        proResProfile: "4444",
-        imageFormat: "png",
-        pixelFormat: PRORES_ALPHA_PIXEL_FORMAT,
-        outputLocation: segmentPaths[i]!,
-        overwrite: true,
-        muted: true,
-        logLevel: "error",
-        concurrency: perSegmentConcurrency,
-        frameRange: [start, end],
-        onProgress: (progress) => {
-          const bucket = Math.floor(progress.progress * 20);
-          if (bucket !== lastBucket) {
-            lastBucket = bucket;
-            logger.info(
-              `Segment ${i}: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${end - start + 1}`,
-            );
-          }
-        },
-      });
-    }),
-  );
+  try {
+    const results = await Promise.allSettled(
+      ranges.map(async ([startFrame, endFrame], index) => {
+        const segmentPngDirectoryPath = path.join(
+          segmentsDir,
+          `frames_${String(index).padStart(3, "0")}`,
+        );
+        const frameStep = getSnapshotRenderStep(composition, snapshotIntervalMs);
+        const renderableFrameCount = getRenderableFrameCount(
+          [startFrame, endFrame],
+          frameStep,
+        );
+        const segmentDurationSeconds =
+          (renderableFrameCount * snapshotIntervalMs) / 1000;
 
-  const renderMs = Date.now() - startedAt;
-  logger.info(
-    `All ${ranges.length} segment(s) rendered in ${(renderMs / 1000).toFixed(1)}s. Concatenating.`,
-  );
+        logger.info(
+          `Segment ${index}: frames ${startFrame}-${endFrame} | ${renderableFrameCount} snapshot(s) | ${segmentDurationSeconds.toFixed(1)}s.`,
+        );
 
-  // Concatenate segments
-  const hasFfmpeg = await checkFfmpegAvailable();
-  if (!hasFfmpeg) {
-    logger.warn(
-      "FFmpeg not found. Cannot concatenate segments. Leaving individual segment files in segments/ directory.",
+        await ensureDirectoryPath(segmentPngDirectoryPath);
+        try {
+          await renderPngSequence(
+            serveUrl,
+            composition,
+            inputProps,
+            segmentPngDirectoryPath,
+            logger,
+            perSegmentConcurrency ?? undefined,
+            snapshotIntervalMs,
+            [startFrame, endFrame],
+          );
+          await runEncode(() =>
+            encodePngSequenceToMov(
+              segmentPngDirectoryPath,
+              segmentPaths[index]!,
+              snapshotIntervalMs,
+              composition.fps,
+              renderableFrameCount,
+              proresProfile,
+              logger,
+            )
+          );
+        } finally {
+          await rm(segmentPngDirectoryPath, { recursive: true, force: true });
+        }
+      }),
     );
-    logger.info(`Segment files: ${segmentPaths.join(", ")}`);
-    // Copy first segment as the output (partial result)
-    await execFileAsync("cp", [segmentPaths[0]!, targetFilePath]);
-    return;
+
+    const rejectedResults = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+
+    const firstRejectedResult = rejectedResults[0];
+
+    if (firstRejectedResult) {
+      throw firstRejectedResult.reason;
+    }
+
+    await ffmpegConcat(segmentPaths, targetFilePath, logger);
+  } finally {
+    process.setMaxListeners(previousMaxListeners);
+    await rm(segmentsDir, { recursive: true, force: true });
   }
+};
 
-  await ffmpegConcat(segmentPaths, targetFilePath, logger);
-  logger.info(`Concatenation complete. Output: ${targetFilePath}`);
+const encodePngSequenceToMov = async (
+  pngDirectoryPath: string,
+  targetFilePath: string,
+  snapshotIntervalMs: number,
+  outputFps: number,
+  frameCount: number,
+  proresProfile: OverlayConfig["render"]["output"]["proresProfile"],
+  logger: StepLogger,
+): Promise<void> => {
+  const ffmpegExecutablePath = await resolveFfmpegExecutablePath();
+  const padLength = Math.max(1, String(Math.max(0, frameCount - 1)).length);
+  const inputPattern = path.join(
+    pngDirectoryPath,
+    `element-%0${padLength}d.png`,
+  );
+  const inputFps = 1000 / snapshotIntervalMs;
 
-  // Clean up segment files
-  await rm(segmentsDir, { recursive: true, force: true });
-  logger.info("Cleaned up temporary segment files.");
+  logger.info(
+    `Encoding MOV from ${inputFps}fps PNG sequence to ${outputFps}fps using ${path.basename(ffmpegExecutablePath)}.`,
+  );
+
+  await execFileAsync(
+    ffmpegExecutablePath,
+    [
+      "-hide_banner",
+      "-loglevel",
+      "error",
+      "-framerate",
+      inputFps.toString(),
+      "-start_number",
+      "0",
+      "-i",
+      inputPattern,
+      "-vf",
+      `fps=${outputFps}`,
+      "-c:v",
+      "prores_ks",
+      "-profile:v",
+      PRORES_PROFILE_TO_FFMPEG_PROFILE[proresProfile],
+      "-pix_fmt",
+      PRORES_ALPHA_PIXEL_FORMAT,
+      "-alpha_bits",
+      "16",
+      "-y",
+      targetFilePath,
+    ],
+    {
+      env: getFfmpegEnv(ffmpegExecutablePath),
+      maxBuffer: 1024 * 1024 * 20,
+    },
+  );
 };
 
 const renderMov = async (
@@ -416,44 +650,48 @@ const renderMov = async (
   targetFilePath: string,
   logger: StepLogger,
   concurrency?: number | undefined,
+  proresProfile: OverlayConfig["render"]["output"]["proresProfile"] = "4444",
+  snapshotIntervalMs = SNAPSHOT_INTERVAL_MS,
 ): Promise<void> => {
-  let lastLoggedProgressBucket = -1;
+  const tempFramesDirectoryPath = path.join(
+    path.dirname(targetFilePath),
+    ".remotion-low-fps-frames",
+  );
   const totalSeconds = composition.durationInFrames / composition.fps;
-  const renderStartTime = Date.now();
 
   logger.info(
-    `Rendering MOV output. Total duration: ${totalSeconds.toFixed(1)}s (${composition.durationInFrames} frames at ${composition.fps}fps).`,
+    `Rendering MOV output via low-frequency PNG snapshots. Total duration: ${totalSeconds.toFixed(1)}s.`,
   );
 
-  await renderMedia({
-    serveUrl,
-    composition,
-    inputProps,
-    codec: "prores",
-    proResProfile: "4444",
-    imageFormat: "png",
-    pixelFormat: PRORES_ALPHA_PIXEL_FORMAT,
-    outputLocation: targetFilePath,
-    overwrite: true,
-    muted: true,
-    logLevel: "error",
-    concurrency: concurrency ?? null,
-    onProgress: (progress) => {
-      const bucket = Math.floor(progress.progress * 20);
+  await ensureDirectoryPath(tempFramesDirectoryPath);
 
-      if (bucket !== lastLoggedProgressBucket) {
-        lastLoggedProgressBucket = bucket;
-        const renderedSeconds = progress.renderedFrames / composition.fps;
-        const elapsedMs = Date.now() - renderStartTime;
-        const eta = progress.progress > 0
-          ? formatEta((elapsedMs / progress.progress - elapsedMs) / 1000)
-          : "--";
-        logger.info(
-          `Render progress: ${Math.round(progress.progress * 100)}% | frame ${progress.renderedFrames}/${composition.durationInFrames} | video ${renderedSeconds.toFixed(1)}s/${totalSeconds.toFixed(1)}s | ETA ${eta} | stage ${progress.stitchStage}`,
-        );
-      }
-    },
-  });
+  try {
+    const frameStep = getSnapshotRenderStep(composition, snapshotIntervalMs);
+    const renderableFrameCount = getRenderableFrameCount(
+      [0, composition.durationInFrames - 1],
+      frameStep,
+    );
+    await renderPngSequence(
+      serveUrl,
+      composition,
+      inputProps,
+      tempFramesDirectoryPath,
+      logger,
+      concurrency,
+      snapshotIntervalMs,
+    );
+    await encodePngSequenceToMov(
+      tempFramesDirectoryPath,
+      targetFilePath,
+      snapshotIntervalMs,
+      composition.fps,
+      renderableFrameCount,
+      proresProfile,
+      logger,
+    );
+  } finally {
+    await rm(tempFramesDirectoryPath, { recursive: true, force: true });
+  }
 };
 
 const renderPngSequence = async (
@@ -463,9 +701,17 @@ const renderPngSequence = async (
   outputDirectoryPath: string,
   logger: StepLogger,
   concurrency?: number | undefined,
+  snapshotIntervalMs = SNAPSHOT_INTERVAL_MS,
+  frameRange?: FrameRange,
 ): Promise<void> => {
   let renderedFrames = 0;
   const renderStartTime = Date.now();
+  const everyNthFrame = getSnapshotRenderStep(composition, snapshotIntervalMs);
+  const effectiveFrameRange: FrameRange = frameRange ?? [0, composition.durationInFrames - 1];
+  const renderedFrameCount = getRenderableFrameCount(
+    effectiveFrameRange,
+    everyNthFrame,
+  );
 
   await renderFrames({
     serveUrl,
@@ -475,22 +721,30 @@ const renderPngSequence = async (
     imageFormat: "png",
     logLevel: "error",
     concurrency: concurrency ?? null,
+    frameRange: effectiveFrameRange,
+    everyNthFrame,
     onStart: ({ frameCount }) => {
-      const totalSeconds = composition.durationInFrames / composition.fps;
+      const totalSeconds = (frameCount * snapshotIntervalMs) / 1000;
+      const outputFps = 1000 / snapshotIntervalMs;
       logger.info(
-        `Rendering ${frameCount} frame(s) as PNG sequence. Total duration: ${totalSeconds.toFixed(1)}s.`,
+        `Rendering ${frameCount} PNG frame(s) at ${outputFps}fps from a ${composition.fps}fps composition. Total duration: ${totalSeconds.toFixed(1)}s.`,
       );
     },
     onFrameUpdate: (framesRendered) => {
-      if (framesRendered !== renderedFrames && framesRendered % 30 === 0) {
+      if (
+        framesRendered !== renderedFrames &&
+        (framesRendered === renderedFrameCount || framesRendered % 10 === 0)
+      ) {
         renderedFrames = framesRendered;
-        const progress = framesRendered / composition.durationInFrames;
+        const progress = framesRendered / renderedFrameCount;
         const elapsedMs = Date.now() - renderStartTime;
         const eta = progress > 0
           ? formatEta((elapsedMs / progress - elapsedMs) / 1000)
           : "--";
+        const renderedSeconds = (framesRendered * snapshotIntervalMs) / 1000;
+        const totalSeconds = (renderedFrameCount * snapshotIntervalMs) / 1000;
         logger.info(
-          `Render progress: frame ${framesRendered}/${composition.durationInFrames} | video ${(framesRendered / composition.fps).toFixed(1)}s/${(composition.durationInFrames / composition.fps).toFixed(1)}s | ETA ${eta}`,
+          `Render progress: frame ${framesRendered}/${renderedFrameCount} | video ${renderedSeconds.toFixed(1)}s/${totalSeconds.toFixed(1)}s | ETA ${eta}`,
         );
       }
     },
@@ -589,7 +843,7 @@ export const renderOverlay = async (
         maxDurationMs: request.maxDurationMs,
       });
       logger.info(
-        `Built ${built.frames.length} frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
+        `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
       );
       return built;
     },
@@ -696,6 +950,7 @@ export const renderOverlay = async (
           framesDirectoryPath,
           logger,
           request.concurrency,
+          frameData.snapshotIntervalMs,
         );
         return framesDirectoryPath;
       }
@@ -706,9 +961,20 @@ export const renderOverlay = async (
         await renderMovSegmented(
           serveUrl, composition, inputProps, movFilePath, logger,
           request.concurrency, requestedSegments,
+          config.render.output.proresProfile,
+          frameData.snapshotIntervalMs,
         );
       } else {
-        await renderMov(serveUrl, composition, inputProps, movFilePath, logger, request.concurrency);
+        await renderMov(
+          serveUrl,
+          composition,
+          inputProps,
+          movFilePath,
+          logger,
+          request.concurrency,
+          config.render.output.proresProfile,
+          frameData.snapshotIntervalMs,
+        );
       }
       return movFilePath;
     },
@@ -736,6 +1002,7 @@ export const renderOverlay = async (
       height: frameData.height,
       fps: frameData.fps,
       durationInFrames: frameData.durationInFrames,
+      snapshotIntervalMs: frameData.snapshotIntervalMs,
       outputFormat: config.render.output.format,
       sampleMaxDurationMs: request.maxDurationMs,
     },

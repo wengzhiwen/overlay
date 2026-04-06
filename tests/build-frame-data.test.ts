@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { defaultOverlayConfig } from "../src/config/defaults.js";
 import type { Activity } from "../src/domain/activity.js";
+import {
+  SNAPSHOT_INTERVAL_MS,
+  getSnapshotForElapsedMs,
+  getSnapshotForRenderFrame,
+} from "../src/domain/frame-data.js";
 import { buildFrameData } from "../src/preprocess/build-frame-data.js";
 
 const activity: Activity = {
@@ -69,7 +74,7 @@ const activity: Activity = {
 };
 
 describe("buildFrameData", () => {
-  it("builds interpolated frame snapshots", async () => {
+  it("builds 1Hz frame snapshots and reuses them within the same second", async () => {
     const frameData = await buildFrameData(activity, {
       ...defaultOverlayConfig,
       render: {
@@ -80,8 +85,14 @@ describe("buildFrameData", () => {
     });
 
     expect(frameData.durationInFrames).toBe(4);
-    expect(frameData.frames[1]?.metrics.distanceM).toBe(5);
-    expect(frameData.frames[1]?.clockTimeIso).toBe("2026-03-25T09:16:45.500Z");
+    expect(frameData.snapshotIntervalMs).toBe(SNAPSHOT_INTERVAL_MS);
+    expect(frameData.frames).toHaveLength(2);
+    expect(frameData.frames[1]?.metrics.distanceM).toBe(10);
+    expect(frameData.frames[1]?.clockTimeIso).toBe("2026-03-25T09:16:46.000Z");
+    expect(getSnapshotForRenderFrame(frameData, 0)?.metrics.distanceM).toBe(0);
+    expect(getSnapshotForRenderFrame(frameData, 1)?.metrics.distanceM).toBe(0);
+    expect(getSnapshotForRenderFrame(frameData, 2)?.metrics.distanceM).toBe(10);
+    expect(getSnapshotForElapsedMs(frameData, 1500)?.metrics.heartRateBpm).toBe(110);
   });
 
   it("caps the render duration when sample mode is enabled", async () => {
@@ -101,6 +112,7 @@ describe("buildFrameData", () => {
     );
 
     expect(frameData.durationInFrames).toBe(2);
-    expect(frameData.frames.at(-1)?.elapsedMs).toBe(500);
+    expect(frameData.frames).toHaveLength(1);
+    expect(frameData.frames.at(-1)?.elapsedMs).toBe(0);
   });
 });

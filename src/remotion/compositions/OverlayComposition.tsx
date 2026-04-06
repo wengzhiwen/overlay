@@ -2,7 +2,11 @@ import { useEffect, useState } from "react";
 import { AbsoluteFill, continueRender, delayRender, useCurrentFrame } from "remotion";
 
 import type { OverlayConfig, WidgetConfig } from "../../config/schema.js";
-import type { FrameData, FrameSnapshot } from "../../domain/frame-data.js";
+import {
+  getSnapshotForRenderFrame,
+  type FrameData,
+  type FrameSnapshot,
+} from "../../domain/frame-data.js";
 import type { FrameDataMeta } from "../Root.js";
 import { defaultTheme, mergeThemeWithConfig } from "../theme/default.js";
 import { DistanceWidget } from "../widgets/DistanceWidget.js";
@@ -24,7 +28,7 @@ const renderWidget = (
   frameIndex: number,
   overlayConfig: OverlayConfig,
 ) => {
-  const frame = frameData.frames[Math.min(frameIndex, frameData.frames.length - 1)];
+  const frame = getSnapshotForRenderFrame(frameData, frameIndex);
   const theme = mergeThemeWithConfig(defaultTheme, overlayConfig.theme);
 
   if (!frame || !widget.enabled) {

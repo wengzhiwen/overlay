@@ -3,6 +3,7 @@ import { Composition, getInputProps } from "remotion";
 import { defaultOverlayConfig } from "../config/defaults.js";
 import type { OverlayConfig } from "../config/schema.js";
 import type { ActivityZone } from "../domain/activity.js";
+import { SNAPSHOT_INTERVAL_MS } from "../domain/frame-data.js";
 import { OverlayComposition } from "./compositions/OverlayComposition.js";
 
 export type FrameDataMeta = {
@@ -10,6 +11,7 @@ export type FrameDataMeta = {
   height: number;
   fps: number;
   durationInFrames: number;
+  snapshotIntervalMs: number;
   heartRateZones: ActivityZone[];
   activityDurationMs: number;
 };
@@ -24,6 +26,7 @@ const DEFAULT_FRAME_DATA_META: FrameDataMeta = {
   height: defaultOverlayConfig.render.height,
   fps: defaultOverlayConfig.render.fps,
   durationInFrames: 1,
+  snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
   heartRateZones: [],
   activityDurationMs: 0,
 };

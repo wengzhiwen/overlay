@@ -1,28 +1,12 @@
 import type { OverlayConfig } from "../config/schema.js";
 import type { Activity, ActivitySample } from "../domain/activity.js";
-import type { FrameData, FrameSnapshot } from "../domain/frame-data.js";
+import {
+  SNAPSHOT_INTERVAL_MS,
+  type FrameData,
+  type FrameSnapshot,
+} from "../domain/frame-data.js";
 
-const interpolateValue = (
-  startValue: number | undefined,
-  endValue: number | undefined,
-  ratio: number,
-): number | undefined => {
-  if (startValue === undefined && endValue === undefined) {
-    return undefined;
-  }
-
-  if (startValue === undefined) {
-    return endValue;
-  }
-
-  if (endValue === undefined) {
-    return startValue;
-  }
-
-  return startValue + (endValue - startValue) * ratio;
-};
-
-const getInterpolatedSample = (
+const getSampleAtElapsedMs = (
   samples: ActivitySample[],
   elapsedMs: number,
 ): ActivitySample | undefined => {
@@ -34,31 +18,12 @@ const getInterpolatedSample = (
     return samples[0];
   }
 
-  const lowerIndex = Math.floor(elapsedMs / 1000);
-  const upperIndex = Math.min(samples.length - 1, lowerIndex + 1);
-  const lower = samples[Math.min(lowerIndex, samples.length - 1)];
-  const upper = samples[upperIndex];
+  const sampleIndex = Math.min(
+    samples.length - 1,
+    Math.floor(elapsedMs / SNAPSHOT_INTERVAL_MS),
+  );
 
-  if (!lower || !upper) {
-    return samples[samples.length - 1];
-  }
-
-  const ratio = Math.max(0, Math.min(1, (elapsedMs - lower.elapsedMs) / 1000));
-
-  return {
-    timestampMs: Math.round(lower.timestampMs + (upper.timestampMs - lower.timestampMs) * ratio),
-    elapsedMs,
-    lat: interpolateValue(lower.lat, upper.lat, ratio),
-    lon: interpolateValue(lower.lon, upper.lon, ratio),
-    altitudeM: interpolateValue(lower.altitudeM, upper.altitudeM, ratio),
-    distanceM: interpolateValue(lower.distanceM, upper.distanceM, ratio),
-    speedMps: interpolateValue(lower.speedMps, upper.speedMps, ratio),
-    heartRateBpm: interpolateValue(lower.heartRateBpm, upper.heartRateBpm, ratio),
-    gradePct: interpolateValue(lower.gradePct, upper.gradePct, ratio),
-    cadenceRpm: interpolateValue(lower.cadenceRpm, upper.cadenceRpm, ratio),
-    powerW: interpolateValue(lower.powerW, upper.powerW, ratio),
-    ascentM: interpolateValue(lower.ascentM, upper.ascentM, ratio),
-  };
+  return samples[sampleIndex];
 };
 
 const getEffectiveDurationMs = (
@@ -98,6 +63,7 @@ export const buildFrameData = async (
     1,
     Math.ceil((durationMs / 1000) * config.render.fps),
   );
+  const snapshotCount = Math.max(1, Math.ceil(durationMs / SNAPSHOT_INTERVAL_MS));
   const startedAtMs = activity.startedAt
     ? new Date(activity.startedAt).getTime()
     : undefined;
@@ -105,18 +71,16 @@ export const buildFrameData = async (
     config.render.durationStrategy === "trimmed" ? config.sync.trimStartMs : 0;
 
   const frames: FrameSnapshot[] = Array.from(
-    { length: durationInFrames },
+    { length: snapshotCount },
     (_, frame) => {
-      const renderTimeMs = (frame / config.render.fps) * 1000;
+      const renderTimeMs = frame * SNAPSHOT_INTERVAL_MS;
       const activityElapsedMs =
         renderTimeMs - config.sync.activityOffsetMs + trimStartMs;
       const isActive =
         activityElapsedMs >= 0 &&
         activityElapsedMs <= (activity.summary.durationMs ?? 0);
       const clampedElapsedMs = Math.max(0, activityElapsedMs);
-      const sample = isActive
-        ? getInterpolatedSample(activity.samples, clampedElapsedMs)
-        : undefined;
+      const sample = isActive ? getSampleAtElapsedMs(activity.samples, clampedElapsedMs) : undefined;
 
       return {
         frame,
@@ -153,6 +117,7 @@ export const buildFrameData = async (
     height: config.render.height,
     fps: config.render.fps,
     durationInFrames,
+    snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
     frames,
     heartRateZones: activity.zones.heartRate,
     activityDurationMs: activity.summary.durationMs ?? 0,
