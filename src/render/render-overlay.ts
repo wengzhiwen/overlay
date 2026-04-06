@@ -562,7 +562,6 @@ const renderMovSegmented = async (
               segmentPaths[index]!,
               snapshotIntervalMs,
               composition.fps,
-              renderableFrameCount,
               proresProfile,
               logger,
             )
@@ -595,16 +594,11 @@ const encodePngSequenceToMov = async (
   targetFilePath: string,
   snapshotIntervalMs: number,
   outputFps: number,
-  frameCount: number,
   proresProfile: OverlayConfig["render"]["output"]["proresProfile"],
   logger: StepLogger,
 ): Promise<void> => {
   const ffmpegExecutablePath = await resolveFfmpegExecutablePath();
-  const padLength = Math.max(1, String(Math.max(0, frameCount - 1)).length);
-  const inputPattern = path.join(
-    pngDirectoryPath,
-    `element-%0${padLength}d.png`,
-  );
+  const inputPattern = path.join(pngDirectoryPath, "*.png");
   const inputFps = 1000 / snapshotIntervalMs;
 
   logger.info(
@@ -619,8 +613,8 @@ const encodePngSequenceToMov = async (
       "error",
       "-framerate",
       inputFps.toString(),
-      "-start_number",
-      "0",
+      "-pattern_type",
+      "glob",
       "-i",
       inputPattern,
       "-vf",
@@ -666,11 +660,6 @@ const renderMov = async (
   await ensureDirectoryPath(tempFramesDirectoryPath);
 
   try {
-    const frameStep = getSnapshotRenderStep(composition, snapshotIntervalMs);
-    const renderableFrameCount = getRenderableFrameCount(
-      [0, composition.durationInFrames - 1],
-      frameStep,
-    );
     await renderPngSequence(
       serveUrl,
       composition,
@@ -685,7 +674,6 @@ const renderMov = async (
       targetFilePath,
       snapshotIntervalMs,
       composition.fps,
-      renderableFrameCount,
       proresProfile,
       logger,
     );
