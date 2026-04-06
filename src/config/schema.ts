@@ -44,6 +44,11 @@ const SpeedWidgetSchema = BaseWidgetSchema.extend({
   precision: z.number().int().min(0).max(3).default(1),
   unit: z.enum(["km/h", "mph"]).default("km/h"),
   showUnit: z.boolean().default(true),
+  colorByZone: z.boolean().default(false),
+  zones: z.array(ZoneSchema).default([]),
+  zoneThresholds: z.array(z.number().finite()).length(4).optional(),
+  showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
+  chartRange: z.enum(["short", "medium", "long"]).default("medium"),
 });
 
 const HeartRateWidgetSchema = BaseWidgetSchema.extend({

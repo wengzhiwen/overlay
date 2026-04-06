@@ -130,7 +130,7 @@ type BaseWidgetConfig = {
 | Widget     | 宽高比 (w:h) |
 |------------|-------------|
 | speed      | 5:3         |
-| heart-rate | 7:6         |
+| heart-rate | 5:3         |
 | elevation  | 5:3         |
 | distance   | 5:3         |
 | time       | 2:1         |
@@ -234,9 +234,22 @@ type SpeedWidgetConfig = BaseWidgetConfig & {
   precision?: number;               // 0–3, 默认 1
   unit?: "km/h" | "mph";           // 默认 "km/h"
   showUnit?: boolean;               // 默认 true
+  colorByZone?: boolean;            // 默认 false
+  zones?: Array<{                   // 默认 []
+    min?: number;
+    max?: number;
+    color: string;
+  }>;
+  zoneThresholds?: [number, number, number, number]; // 5-zone 阈值，单位随 unit
+  showChart?: "auto" | boolean;     // 默认 "auto"
+  chartRange?: "short" | "medium" | "long";  // 默认 "medium"
 };
 ```
 
+- 次要行：速度柱状图（自动显示）
+- 速度图表的 X 轴行为与 HeartRateChart 一致
+- 柱状图 Y 轴默认 0–35 km/h；当 `unit = "mph"` 时自动换算为 mph
+- `zoneThresholds` 支持典型 5-zone 配置，默认阈值为 20 / 25 / 30 / 35 km/h
 - 不加入趋势箭头
 - 不加入均速或圈速信息
 

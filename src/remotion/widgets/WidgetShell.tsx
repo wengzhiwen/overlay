@@ -33,12 +33,12 @@ export const WidgetShell = ({
   unit,
   secondary,
   isEmpty = false,
-  valueColor: _valueColor,
+  valueColor,
   verticalLayout = "spread",
   secondaryPlacement = "flow",
 }: WidgetShellProps): ReactNode => {
-  void _valueColor;
   const isCompactLayout = verticalLayout === "compact";
+  const resolvedValueColor = valueColor ?? config.valueColor ?? theme.colors.text;
 
   const containerStyle: CSSProperties = {
     position: "absolute",
@@ -53,7 +53,7 @@ export const WidgetShell = ({
     borderWidth: config.borderWidth,
     borderStyle: "solid",
     borderRadius: config.borderRadius,
-    color: config.valueColor ?? theme.colors.text,
+    color: resolvedValueColor,
     display: "flex",
     flexDirection: "column",
     justifyContent: isCompactLayout ? "flex-start" : "space-between",
@@ -80,7 +80,7 @@ export const WidgetShell = ({
 
   const valueStyle: CSSProperties = {
     fontSize: config.valueFontSize,
-    color: config.valueColor ?? theme.colors.text,
+    color: resolvedValueColor,
     fontWeight: 700,
     lineHeight: 1,
   };
