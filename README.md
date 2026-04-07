@@ -120,7 +120,7 @@ The config file currently supports:
   - `noodlemap`
 - Global theme and per-widget position, size, and styling
 
-See [examples/sample-config.json](examples/sample-config.json) for a working example.
+See [examples/sample-config.json](examples/sample-config.json) for a working example. For detailed widget configuration, see the [Widget Configuration Guide](docs/widget-guide_en.md).
 
 I'm not great at visual design — widget PRs are very welcome!
 

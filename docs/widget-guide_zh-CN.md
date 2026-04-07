@@ -1,5 +1,7 @@
 # Widget 配置指南
 
+**[English](widget-guide_en.md)** | **[日本語](widget-guide_ja.md)** | **简体中文**
+
 本文档详细介绍 Overlay 生成器支持的所有 Widget 类型及其配置项。
 
 ## 目录

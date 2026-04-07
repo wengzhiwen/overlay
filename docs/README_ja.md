@@ -120,7 +120,7 @@ output/demo-run/
   - `noodlemap`
 - グローバルテーマとウィジェットごとの位置、サイズ、スタイル設定
 
-動作例は [examples/sample-config.json](../examples/sample-config.json) を参照してください。
+動作例は [examples/sample-config.json](../examples/sample-config.json) を参照してください。Widget の詳細な設定については [Widget 設定ガイド](widget-guide_ja.md) をご覧ください。
 
 デザインセンスには自信がありません — ウィジェットの PR を大歓迎します！
 

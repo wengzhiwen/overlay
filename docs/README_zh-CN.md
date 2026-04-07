@@ -119,7 +119,7 @@ output/demo-run/
   - `noodlemap`
 - 全局 theme 和每个 widget 的位置、尺寸、基础样式
 
-可直接参考 [examples/sample-config.json](../examples/sample-config.json)。
+可直接参考 [examples/sample-config.json](../examples/sample-config.json)。详细的 Widget 配置说明请参考 [Widget 配置指南](widget-guide_zh-CN.md)。
 
 我是一个没有审美能力的人，欢迎大家提供你们的widget的PR给我。
 
