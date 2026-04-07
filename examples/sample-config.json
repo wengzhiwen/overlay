@@ -43,6 +43,14 @@
       "y": 760,
       "scale": 0.146,
       "colorByZone": true,
+      "zones": [
+        { "max": 106, "color": "#94a3b8" },
+        { "min": 106, "max": 133, "color": "#60a5fa" },
+        { "min": 133, "max": 148, "color": "#34d399" },
+        { "min": 148, "max": 158, "color": "#fbbf24" },
+        { "min": 158, "max": 166, "color": "#fb923c" },
+        { "min": 166, "color": "#f87171" }
+      ],
       "showChart": "auto",
       "chartRange": "medium"
     },
