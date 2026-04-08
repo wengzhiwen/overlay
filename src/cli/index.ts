@@ -7,6 +7,9 @@ import { spawn } from "node:child_process";
 import { Command } from "commander";
 
 import { runRenderCommand } from "./commands/render.js";
+import type { WorkerCliOptions } from "../worker/config.js";
+import { resolveWorkerConfig } from "../worker/config.js";
+import { runWorker } from "../worker/index.js";
 
 type PackageMetadata = {
   name?: string;
@@ -105,6 +108,25 @@ const main = async (): Promise<void> => {
         process.exitCode = await runRenderCommand(options);
       },
     );
+
+  program
+    .command("worker")
+    .description(
+      "Start overlay worker that connects to MotionO and processes render jobs.",
+    )
+    .option("--server <url>", "MotionO server URL (overrides WORKER_SERVER_URL)")
+    .option("--api-key <key>", "Worker API key (overrides WORKER_API_KEY)")
+    .option("--work-dir <path>", "Local working directory (overrides WORKER_WORK_DIR)")
+    .option(
+      "--heartbeat-interval <seconds>",
+      "Heartbeat interval in seconds",
+    )
+    .option("--poll-interval <seconds>", "Job poll interval in seconds")
+    .option("--concurrency <number>", "Max concurrent render jobs")
+    .action(async (options: WorkerCliOptions) => {
+      const config = resolveWorkerConfig(options);
+      await runWorker(config);
+    });
 
   await program.parseAsync(process.argv);
 };
