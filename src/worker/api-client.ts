@@ -45,6 +45,7 @@ export type ApiClient = {
         size_bytes: number;
         started_at?: string;
       }>;
+      video_segments: number[];
       render_metadata?: Record<string, unknown>;
     },
   ): Promise<void>;

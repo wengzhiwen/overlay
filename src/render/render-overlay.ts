@@ -43,7 +43,7 @@ export type RenderOverlayResult = {
   exitCode: number;
   message: string;
   outputPath: string;
-  outputs: Array<{ path: string; startedAt: string | undefined }>;
+  outputs: Array<{ path: string; startedAt: string | undefined; durationSeconds: number }>;
 };
 
 type RenderMetadata = {
@@ -874,7 +874,7 @@ export const renderOverlay = async (
 
   // Process each segment sequentially: derive → interpolate → smooth → fill gaps →
   // build frame data → write frame data → render.
-  const renderOutputs: Array<{ path: string; startedAt: string | undefined }> = [];
+  const renderOutputs: Array<{ path: string; startedAt: string | undefined; durationSeconds: number }> = [];
   let cumulativeElapsedOffsetMs = 0;
 
   for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
@@ -1082,6 +1082,7 @@ export const renderOverlay = async (
     renderOutputs.push({
       path: segmentFinalOutputPath,
       startedAt: segment.startedAt,
+      durationSeconds: Math.ceil(frameData.durationInFrames / frameData.fps),
     });
 
     // Write per-segment metadata.

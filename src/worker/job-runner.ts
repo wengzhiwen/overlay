@@ -193,15 +193,20 @@ export const runJob = async (
     }
 
     // 8. Notify completion (aggressive retry — render work is already done)
+    const videoSegments = result.outputs.map(
+      (output) => output.durationSeconds,
+    );
     const completePayload: {
       result_files: Array<{
         filename: string;
         size_bytes: number;
         started_at?: string;
       }>;
+      video_segments: number[];
       render_metadata?: Record<string, unknown>;
     } = {
       result_files: uploadedResultFiles,
+      video_segments: videoSegments,
     };
     if (renderMetadata) {
       completePayload.render_metadata = renderMetadata;
