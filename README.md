@@ -24,11 +24,22 @@ It's a lightweight solution — no paid subscriptions, no clunky software you'll
 - npm >= 10
 - ffmpeg
 
-## Setup
+## Quick Start
 
 ```bash
-npm install
+git clone https://github.com/wengzhiwen/overlay.git
+cd overlay
+npm ci
+npm run build
+npm run test
+npm run dev -- --help
+npm run dev -- render \
+  --input path/to/activity/file.tcx \
+  --config examples/sample-config.json \
+  --sample
 ```
+
+`npm install` also works, but `npm ci` is recommended for a clean first-time setup from GitHub. 
 
 ## Available Scripts
 
@@ -42,7 +53,7 @@ npm run dev -- --help
 
 ## Usage
 
-Run in development mode:
+Show CLI help:
 
 ```bash
 npm run dev -- --help

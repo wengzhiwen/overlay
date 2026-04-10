@@ -24,11 +24,22 @@
 - npm >= 10
 - ffmpeg
 
-## Setup
+## Quick Start
 
 ```bash
-npm install
+git clone https://github.com/wengzhiwen/overlay.git
+cd overlay
+npm ci
+npm run build
+npm run test
+npm run dev -- --help
+npm run dev -- render \
+  --input path/to/activity/file.tcx \
+  --config examples/sample-config.json \
+  --sample
 ```
+
+如果你更习惯 `npm install` 也可以，但从 GitHub 首次拉起时更推荐 `npm ci`。
 
 ## Available Scripts
 
@@ -42,7 +53,7 @@ npm run dev -- --help
 
 ## Usage
 
-开发态运行：
+查看 CLI 帮助：
 
 ```bash
 npm run dev -- --help
@@ -52,7 +63,7 @@ npm run dev -- --help
 
 ```bash
 npm run dev -- render \
-  --input path/to/a/tcx gpx/file.tcx \
+  --input path/to/activity/file.tcx \
   --config examples/sample-config.json \
   --sample
 ```
