@@ -28,20 +28,22 @@
   },
   "widgets": [
     {
-      "id": "speed-main",
+      "id": "speed-top-left",
       "type": "speed",
       "enabled": true,
-      "x": 80,
-      "y": 760,
-      "scale": 0.146
+      "style": "without-bgc",
+      "x": 60,
+      "y": 60,
+      "scale": 0.25
     },
     {
-      "id": "hr-main",
+      "id": "heart-rate-top-left",
       "type": "heart-rate",
       "enabled": true,
-      "x": 390,
-      "y": 760,
-      "scale": 0.146,
+      "style": "without-bgc",
+      "x": 720,
+      "y": 60,
+      "scale": 0.25,
       "colorByZone": true,
       "zones": [
         { "max": 106, "color": "#94a3b8" },
@@ -55,51 +57,35 @@
       "chartRange": "medium"
     },
     {
-      "id": "elev-main",
-      "type": "elevation",
-      "enabled": true,
-      "x": 700,
-      "y": 760,
-      "scale": 0.146,
-      "showAscent": true
-    },
-    {
-      "id": "distance-main",
+      "id": "distance-top-right",
       "type": "distance",
       "enabled": true,
-      "x": 1010,
-      "y": 760,
-      "scale": 0.146
+      "style": "without-bgc",
+      "x": 1380,
+      "y": 60,
+      "scale": 0.25
     },
     {
-      "id": "time-main",
-      "type": "time",
-      "enabled": true,
-      "x": 1320,
-      "y": 760,
-      "scale": 0.188,
-      "mode": "both",
-      "timezone": "Asia/Singapore"
-    },
-    {
-      "id": "noodlemap-main",
-      "type": "noodlemap",
-      "enabled": true,
-      "x": 1560,
-      "y": 80,
-      "scale": 0.146,
-      "lineColor": "#ffffff",
-      "lineWeight": "M"
-    },
-    {
-      "id": "citymap-main",
+      "id": "citymap-top-right",
       "type": "citymap",
-      "enabled": false,
-      "x": 1560,
-      "y": 80,
-      "scale": 0.146,
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 1380,
+      "y": 425,
+      "scale": 0.25,
       "lineColor": "#34d399",
       "lineWeight": "M"
+    },
+    {
+      "id": "time-bottom-right",
+      "type": "time",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 1380,
+      "y": 790,
+      "scale": 0.25,
+      "mode": "both",
+      "timezone": "Asia/Singapore"
     }
   ],
   "debug": {
