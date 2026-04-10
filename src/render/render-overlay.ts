@@ -20,6 +20,11 @@ import { interpolateActivity } from "../preprocess/interpolate.js";
 import { normalizeActivity } from "../preprocess/normalize.js";
 import { smoothActivity } from "../preprocess/smooth.js";
 import { splitActivityAtLongGaps } from "../preprocess/split-activity.js";
+import {
+  consumeRemainingRenderBudgetMs,
+  MIN_REMAINING_RENDER_BUDGET_MS,
+  shouldRenderNextSegment,
+} from "./render-budget.js";
 import { PRORES_ALPHA_PIXEL_FORMAT } from "./codecs.js";
 import {
   copyFileToDirectory,
@@ -876,8 +881,19 @@ export const renderOverlay = async (
   // build frame data → write frame data → render.
   const renderOutputs: Array<{ path: string; startedAt: string | undefined; durationSeconds: number }> = [];
   let cumulativeElapsedOffsetMs = 0;
+  let remainingRenderBudgetMs = request.maxDurationMs;
 
   for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
+    if (!shouldRenderNextSegment(remainingRenderBudgetMs)) {
+      const remainingBudgetMs = remainingRenderBudgetMs ?? 0;
+      onProgress(
+        remainingBudgetMs <= 0
+          ? `Reached maxRenderTimeMs for this job. Skipping the remaining ${activitySegments.length - segmentIndex} segment(s).`
+          : `Remaining maxRenderTimeMs for this job is below ${(MIN_REMAINING_RENDER_BUDGET_MS / 1000).toFixed(0)} seconds. Skipping the remaining ${activitySegments.length - segmentIndex} segment(s).`,
+      );
+      break;
+    }
+
     const segment = activitySegments[segmentIndex]!;
     const segmentLabel = activitySegments.length > 1
       ? `segment ${segmentIndex + 1}/${activitySegments.length}`
@@ -940,7 +956,7 @@ export const renderOverlay = async (
         logger.info("Building frame data.");
         const built = await buildFrameData(processedActivity, config, {
           elapsedOffsetMs: cumulativeElapsedOffsetMs,
-          maxDurationMs: request.maxDurationMs,
+          maxDurationMs: remainingRenderBudgetMs,
         });
         logger.info(
           `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
@@ -1114,6 +1130,10 @@ export const renderOverlay = async (
 
     await writeJsonFile(path.join(segmentOutputPath, "metadata.json"), metadata);
 
+    remainingRenderBudgetMs = consumeRemainingRenderBudgetMs(
+      remainingRenderBudgetMs,
+      (frameData.durationInFrames / frameData.fps) * 1000,
+    );
     cumulativeElapsedOffsetMs += processedActivity.summary.durationMs ?? 0;
     if (segmentIndex < activitySegments.length - 1) {
       cumulativeElapsedOffsetMs += SNAPSHOT_INTERVAL_MS;
