@@ -46,18 +46,19 @@ export const CityMapWidget = ({
   );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const [mapReady, setMapReady] = useState(false);
 
-  // Single delayRender handle that covers the entire lifecycle:
-  // map init → route data set → camera fit → map idle.
-  // In Remotion each frame is a fresh mount, so one handle is sufficient.
-  const [renderHandle] = useState(() =>
-    delayRender(`CityMap: ${config.id}`),
+  // initHandle: holds render until map is loaded and source/layer are added.
+  // Created once with useState so it persists across re-renders.
+  const [initHandle] = useState(() =>
+    delayRender(`CityMap init: ${config.id}`),
   );
 
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) {
-      continueRender(renderHandle);
+      continueRender(initHandle);
       return;
     }
 
@@ -103,41 +104,68 @@ export const CityMapWidget = ({
         },
       });
 
-      // Set route data and fit camera for this frame right after load,
-      // so Remotion captures the correct state when it screenshots.
-      const geojson = buildRouteGeoJSON(frameData.frames, frame.elapsedMs);
-      const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource;
-      source.setData(geojson as ReturnType<typeof buildRouteGeoJSON>);
-
-      const visible = buildVisibleCoordinates(
-        frameData.frames,
-        frame.elapsedMs,
-      );
-      const allCoords = visible.map((v) => v.lonLat);
-      const bounds = computeBounds(allCoords);
-
-      if (bounds) {
-        const lngLatBounds = new maplibregl.LngLatBounds(bounds.sw, bounds.ne);
-        map.fitBounds(lngLatBounds, {
-          padding: Math.max(lineWidth, 20),
-          duration: 0,
-          maxZoom: 17,
-        });
-      }
-
-      map.once("idle", () => {
-        continueRender(renderHandle);
-      });
+      mapRef.current = map;
+      setMapReady(true);
+      continueRender(initHandle);
     });
 
     map.on("error", () => {
-      continueRender(renderHandle);
+      continueRender(initHandle);
     });
 
     return () => {
       map.remove();
+      mapRef.current = null;
     };
   }, []);
+
+  // Frame update effect: runs each time frame.elapsedMs changes.
+  // Creates a fresh delayRender handle per run so Remotion waits for the
+  // map to reflect the correct frame data before screenshotting.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) {
+      // Map not ready yet — initHandle is still blocking; nothing to do here.
+      return;
+    }
+
+    const handle = delayRender(`CityMap frame: ${config.id}`);
+    let released = false;
+    const release = () => {
+      if (!released) {
+        released = true;
+        continueRender(handle);
+      }
+    };
+
+    const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource | undefined;
+    if (!source) {
+      release();
+      return release;
+    }
+
+    const geojson = buildRouteGeoJSON(frameData.frames, frame.elapsedMs);
+    source.setData(geojson as ReturnType<typeof buildRouteGeoJSON>);
+
+    const visible = buildVisibleCoordinates(frameData.frames, frame.elapsedMs);
+    const allCoords = visible.map((v) => v.lonLat);
+    const bounds = computeBounds(allCoords);
+
+    if (bounds) {
+      const lngLatBounds = new maplibregl.LngLatBounds(bounds.sw, bounds.ne);
+      map.fitBounds(lngLatBounds, {
+        padding: Math.max(lineWidth, 20),
+        duration: 0,
+        maxZoom: 17,
+      });
+    }
+
+    map.once("idle", release);
+    map.once("error", release);
+
+    // Cleanup: if this effect re-runs before idle fires, release the old handle.
+    return release;
+  }, [frame.elapsedMs, mapReady, frameData.frames, lineWidth]);
 
   const isWithoutBgc = config.style === "without-bgc";
   const resolvedLabelColor = config.labelColor ?? theme.colors.secondary;
