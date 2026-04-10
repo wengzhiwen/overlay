@@ -146,6 +146,7 @@ export const OverlayConfigSchema = z
         .enum(["activity", "fixed", "trimmed"])
         .default("activity"),
       durationMs: positiveNumber.optional(),
+      maxRenderTimeMs: positiveNumber.optional(),
       output: z
         .object({
           format: OutputFormatSchema.default("mov"),

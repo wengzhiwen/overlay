@@ -127,11 +127,17 @@ export const runJob = async (
       }
     };
 
+    // Read maxRenderTimeMs from layout_config (injected by MotionO based on user tier)
+    const maxDurationMs = (job.layout_config as Record<string, unknown>)?.render
+      ? ((job.layout_config as Record<string, unknown>).render as Record<string, unknown>)?.maxRenderTimeMs as number | undefined
+      : undefined;
+
     const result = await renderOverlay({
       inputPath: activityPath,
       configPath,
       outputPath,
       onProgress: reportProgress,
+      maxDurationMs,
     });
 
     checkAborted();
