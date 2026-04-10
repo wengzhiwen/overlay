@@ -133,6 +133,11 @@ Worker 启动
 
 Worker 通过 `GET /workers/jobs/next` 长轮询（30s 超时）抢占任务。
 
+MotionO 返回的 Job payload 现在还会包含 `result_storage`，用于声明结果文件应如何回传：
+
+- `local`：沿用当前三步分块上传回 MotionO
+- `r2`：Worker 对每个结果文件生成随机对象名，向 MotionO 初始化 multipart 上传，再按 part 申请 presigned `PUT` URL 直接上传到 MotionO 指定的 Cloudflare R2 bucket
+
 选择长轮询的理由：
 - Worker 数量少（1-5），无需 WebSocket 的双向通信
 - 无需维护连接状态，重启即恢复
@@ -159,15 +164,26 @@ db.jobs.findOneAndUpdate(
 结果视频可能数百 MB，使用 init → chunk → complete 三步协议：
 
 ```
+### local 模式
+
 1. POST upload-init     → 获得 upload_id
-2. PUT  upload-chunk    → 5MB/块，可并发
+2. PUT  upload-chunk    → 5MB/块，可重试
 3. POST upload-complete → 验证并定稿
+
+### r2 模式
+
+1. Worker 生成随机 `storage_key`
+2. POST `/workers/jobs/<id>/result-files/multipart-init`
+3. MotionO 返回 `upload_id` 与 part 大小
+4. Worker 为每个 part 申请 presigned `PUT` URL 并上传到 R2
+5. 全部分片完成后通知 MotionO `multipart-complete`
+6. `completeJob` 回传 `filename`、`storage_key`、大小等元数据
 ```
 
 选择自定义协议而非 tus 的理由：
 - 避免引入 tus 库到两个项目
 - Worker 数量少，协议复杂度与规模匹配
-- 服务端实现简单（追加写入 + 大小校验）
+- 服务端实现简单（本地模式按 chunk 偏移覆写 + 大小校验；R2 模式走 multipart）
 
 ### 5.4 不新增 npm 依赖
 
@@ -208,6 +224,9 @@ Worker 在 `{workDir}/state/{jobId}.json` 持久化任务状态：
   "activity_filename": "activity.gpx",
   "activity_size_bytes": 123,
   "layout_config": {},
+  "result_storage": {
+    "backend": "local"
+  },
   "status": "claimed",
   "claimedAt": "2026-04-08T..."
 }
