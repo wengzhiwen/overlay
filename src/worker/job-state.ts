@@ -4,6 +4,7 @@ import path from "node:path";
 import { ensureDirectoryPath } from "../utils/files.js";
 
 import type { ClaimedJob } from "./api-client.js";
+import type { ResultStorage } from "./api-client.js";
 
 export type JobStateFile = {
   jobId: string;
@@ -11,6 +12,7 @@ export type JobStateFile = {
   activity_filename: string;
   activity_size_bytes: number;
   layout_config: Record<string, unknown>;
+  result_storage: ResultStorage;
   status: "claimed" | "processing";
   claimedAt: string;
 };
@@ -33,6 +35,7 @@ export const saveJobState = async (
     activity_filename: job.activity_filename,
     activity_size_bytes: job.activity_size_bytes,
     layout_config: job.layout_config,
+    result_storage: job.result_storage,
     status: "claimed",
     claimedAt: new Date().toISOString(),
   };

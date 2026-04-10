@@ -1,4 +1,4 @@
-import { rm, stat } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import path from "node:path";
 
 import { renderOverlay } from "../render/render-overlay.js";
@@ -7,7 +7,7 @@ import { ensureDirectoryPath, writeJsonFile } from "../utils/files.js";
 import type { ApiClient } from "./api-client.js";
 import type { ClaimedJob } from "./api-client.js";
 import type { WorkerConfig } from "./config.js";
-import { uploadFileWithResume } from "./file-transfer.js";
+import { uploadFileToResultStorage } from "./file-transfer.js";
 import { logger } from "./logger.js";
 import { removeJobState, saveJobState, updateJobStateStatus } from "./job-state.js";
 import { withRetry } from "./retry.js";
@@ -155,35 +155,44 @@ export const runJob = async (
       throw new Error("Render completed without producing any output files");
     }
 
-    for (const output of result.outputs) {
-      checkAborted();
-      await uploadFileWithResume(apiClient, job.id, output.path, config);
-    }
-
-    checkAborted();
-
-    // 6. Collect result file metadata
     const uploadedResultFiles: Array<{
       filename: string;
+      storage_key: string;
       size_bytes: number;
       started_at?: string;
+      content_type?: string;
     }> = [];
 
     for (const output of result.outputs) {
-      const outputStat = await stat(output.path);
+      checkAborted();
+      const uploadedFile = await uploadFileToResultStorage(
+        apiClient,
+        job.id,
+        output.path,
+        job.result_storage,
+        config,
+      );
       const entry: {
         filename: string;
+        storage_key: string;
         size_bytes: number;
         started_at?: string;
+        content_type?: string;
       } = {
-        filename: path.basename(output.path),
-        size_bytes: outputStat.size,
+        filename: uploadedFile.filename,
+        storage_key: uploadedFile.storage_key,
+        size_bytes: uploadedFile.size_bytes,
       };
       if (output.startedAt) {
         entry.started_at = output.startedAt;
       }
+      if (uploadedFile.content_type) {
+        entry.content_type = uploadedFile.content_type;
+      }
       uploadedResultFiles.push(entry);
     }
+
+    checkAborted();
 
     // 7. Read render metadata if available
     let renderMetadata: Record<string, unknown> | undefined;
@@ -205,8 +214,10 @@ export const runJob = async (
     const completePayload: {
       result_files: Array<{
         filename: string;
+        storage_key: string;
         size_bytes: number;
         started_at?: string;
+        content_type?: string;
       }>;
       video_segments: number[];
       render_metadata?: Record<string, unknown>;

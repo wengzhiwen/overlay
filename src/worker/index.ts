@@ -221,6 +221,7 @@ const recoverJobs = async (
       activity_filename: serverJob.activity_filename,
       activity_size_bytes: serverJob.activity_size_bytes,
       layout_config: serverJob.layout_config,
+      result_storage: serverJob.result_storage,
     };
 
     const jobPromise = runAndTrackJob(claimedJob, config, apiClient, abortedJobs);

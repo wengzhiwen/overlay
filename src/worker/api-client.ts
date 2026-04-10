@@ -9,6 +9,7 @@ export type ClaimedJob = {
   activity_filename: string;
   activity_size_bytes: number;
   layout_config: Record<string, unknown>;
+  result_storage: ResultStorage;
 };
 
 export type HeartbeatResponse = {
@@ -23,6 +24,35 @@ export type ActiveJob = {
   activity_size_bytes: number;
   layout_config: Record<string, unknown>;
   progress_pct: number;
+  result_storage: ResultStorage;
+};
+
+export type ResultStorage =
+  | {
+    backend: "local";
+  }
+  | {
+    backend: "r2";
+    key_prefix: string;
+    upload_url_ttl_seconds: number;
+  };
+
+export type ResultFileUploadPlan = {
+  storage_key: string;
+  method: "PUT";
+  url: string;
+  headers: Record<string, string>;
+  expires_at: string;
+};
+
+export type MultipartUploadSession = {
+  storage_key: string;
+  upload_id: string;
+  part_size_bytes: number;
+};
+
+export type MultipartPartUploadPlan = ResultFileUploadPlan & {
+  part_number: number;
 };
 
 type ApiResponse<T = unknown> = {
@@ -42,8 +72,10 @@ export type ApiClient = {
     result: {
       result_files: Array<{
         filename: string;
+        storage_key?: string;
         size_bytes: number;
         started_at?: string;
+        content_type?: string;
       }>;
       video_segments: number[];
       render_metadata?: Record<string, unknown>;
@@ -69,6 +101,46 @@ export type ApiClient = {
     uploadId: string,
     jobId: string,
     filename: string,
+  ): Promise<void>;
+  presignResultFileUpload(
+    jobId: string,
+    payload: {
+      filename: string;
+      storage_key: string;
+      size_bytes: number;
+      content_type?: string;
+    },
+  ): Promise<ResultFileUploadPlan>;
+  initMultipartResultUpload(
+    jobId: string,
+    payload: {
+      filename: string;
+      storage_key: string;
+      content_type?: string;
+    },
+  ): Promise<MultipartUploadSession>;
+  presignMultipartResultPart(
+    jobId: string,
+    payload: {
+      storage_key: string;
+      upload_id: string;
+      part_number: number;
+    },
+  ): Promise<MultipartPartUploadPlan>;
+  completeMultipartResultUpload(
+    jobId: string,
+    payload: {
+      storage_key: string;
+      upload_id: string;
+      parts: Array<{ part_number: number; etag: string }>;
+    },
+  ): Promise<void>;
+  abortMultipartResultUpload(
+    jobId: string,
+    payload: {
+      storage_key: string;
+      upload_id: string;
+    },
   ): Promise<void>;
 };
 
@@ -128,6 +200,10 @@ const request = async <T = unknown>(
   }
 };
 
+const normalizeResultStorage = (
+  resultStorage: ResultStorage | undefined,
+): ResultStorage => resultStorage ?? { backend: "local" };
+
 export const createApiClient = (config: WorkerConfig): ApiClient => {
   return {
     async sendHeartbeat(): Promise<HeartbeatResponse> {
@@ -150,7 +226,10 @@ export const createApiClient = (config: WorkerConfig): ApiClient => {
       if (!res.ok) {
         throw new Error(`Get active jobs failed: ${res.status}`);
       }
-      return res.data.jobs ?? [];
+      return (res.data.jobs ?? []).map((job) => ({
+        ...job,
+        result_storage: normalizeResultStorage(job.result_storage),
+      }));
     },
 
     async claimNextJob(): Promise<ClaimedJob | null> {
@@ -163,7 +242,13 @@ export const createApiClient = (config: WorkerConfig): ApiClient => {
       if (!res.ok) {
         throw new Error(`Claim failed: ${res.status}`);
       }
-      return res.data.job ?? null;
+      if (!res.data.job) {
+        return null;
+      }
+      return {
+        ...res.data.job,
+        result_storage: normalizeResultStorage(res.data.job.result_storage),
+      };
     },
 
     async startJob(jobId: string): Promise<void> {
@@ -196,9 +281,12 @@ export const createApiClient = (config: WorkerConfig): ApiClient => {
       result: {
         result_files: Array<{
           filename: string;
+          storage_key?: string;
           size_bytes: number;
           started_at?: string;
+          content_type?: string;
         }>;
+        video_segments: number[];
         render_metadata?: Record<string, unknown>;
       },
     ): Promise<void> {
@@ -354,6 +442,104 @@ export const createApiClient = (config: WorkerConfig): ApiClient => {
       });
       if (!res.ok) {
         throw new Error(`Upload complete failed: ${res.status}`);
+      }
+    },
+
+    async presignResultFileUpload(
+      jobId: string,
+      payload: {
+        filename: string;
+        storage_key: string;
+        size_bytes: number;
+        content_type?: string;
+      },
+    ): Promise<ResultFileUploadPlan> {
+      const res = await request<{ upload: ResultFileUploadPlan }>(
+        config,
+        "POST",
+        `/workers/jobs/${jobId}/result-files/presign`,
+        { body: payload },
+      );
+      if (!res.ok) {
+        throw new Error(`Presign result upload failed: ${res.status}`);
+      }
+      return res.data.upload;
+    },
+
+    async initMultipartResultUpload(
+      jobId: string,
+      payload: {
+        filename: string;
+        storage_key: string;
+        content_type?: string;
+      },
+    ): Promise<MultipartUploadSession> {
+      const res = await request<{ upload: MultipartUploadSession }>(
+        config,
+        "POST",
+        `/workers/jobs/${jobId}/result-files/multipart-init`,
+        { body: payload },
+      );
+      if (!res.ok) {
+        throw new Error(`Init multipart result upload failed: ${res.status}`);
+      }
+      return res.data.upload;
+    },
+
+    async presignMultipartResultPart(
+      jobId: string,
+      payload: {
+        storage_key: string;
+        upload_id: string;
+        part_number: number;
+      },
+    ): Promise<MultipartPartUploadPlan> {
+      const res = await request<{ upload: MultipartPartUploadPlan }>(
+        config,
+        "POST",
+        `/workers/jobs/${jobId}/result-files/multipart-part-url`,
+        { body: payload },
+      );
+      if (!res.ok) {
+        throw new Error(`Presign multipart result part failed: ${res.status}`);
+      }
+      return res.data.upload;
+    },
+
+    async completeMultipartResultUpload(
+      jobId: string,
+      payload: {
+        storage_key: string;
+        upload_id: string;
+        parts: Array<{ part_number: number; etag: string }>;
+      },
+    ): Promise<void> {
+      const res = await request(
+        config,
+        "POST",
+        `/workers/jobs/${jobId}/result-files/multipart-complete`,
+        { body: payload },
+      );
+      if (!res.ok) {
+        throw new Error(`Complete multipart result upload failed: ${res.status}`);
+      }
+    },
+
+    async abortMultipartResultUpload(
+      jobId: string,
+      payload: {
+        storage_key: string;
+        upload_id: string;
+      },
+    ): Promise<void> {
+      const res = await request(
+        config,
+        "POST",
+        `/workers/jobs/${jobId}/result-files/multipart-abort`,
+        { body: payload },
+      );
+      if (!res.ok) {
+        throw new Error(`Abort multipart result upload failed: ${res.status}`);
       }
     },
   };
