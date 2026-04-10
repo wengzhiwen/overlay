@@ -22,6 +22,10 @@ const getLabelHeight = (config: CityMapWidgetConfig): number => {
 const SOURCE_ID = "route";
 const LAYER_ID = "route-line";
 
+// 1×1 transparent RGBA pixel, used to synchronously register a fallback for
+// missing sprite icons so MapLibre does not log console warnings.
+const TRANSPARENT_1X1 = { width: 1, height: 1, data: new Uint8Array([0, 0, 0, 0]) };
+
 export const CityMapWidget = ({
   frame,
   frameData,
@@ -42,18 +46,18 @@ export const CityMapWidget = ({
   );
 
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<maplibregl.Map | null>(null);
-  const [mapReady, setMapReady] = useState(false);
 
-  // Initialize map once
-  const [initHandle] = useState(() =>
-    delayRender(`CityMap init: ${config.id}`),
+  // Single delayRender handle that covers the entire lifecycle:
+  // map init → route data set → camera fit → map idle.
+  // In Remotion each frame is a fresh mount, so one handle is sufficient.
+  const [renderHandle] = useState(() =>
+    delayRender(`CityMap: ${config.id}`),
   );
 
   useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) {
-      continueRender(initHandle);
+      continueRender(renderHandle);
       return;
     }
 
@@ -65,6 +69,14 @@ export const CityMapWidget = ({
       attributionControl: false,
       center: [0, 0],
       zoom: 1,
+    });
+
+    // Synchronously register a transparent 1×1 fallback for every missing
+    // sprite icon to suppress "Image X could not be loaded" console warnings.
+    map.on("styleimagemissing", (e: { id: string }) => {
+      if (!map.hasImage(e.id)) {
+        map.addImage(e.id, TRANSPARENT_1X1);
+      }
     });
 
     map.on("load", () => {
@@ -91,71 +103,41 @@ export const CityMapWidget = ({
         },
       });
 
-      mapRef.current = map;
-      setMapReady(true);
-      continueRender(initHandle);
-    });
+      // Set route data and fit camera for this frame right after load,
+      // so Remotion captures the correct state when it screenshots.
+      const geojson = buildRouteGeoJSON(frameData.frames, frame.elapsedMs);
+      const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource;
+      source.setData(geojson as ReturnType<typeof buildRouteGeoJSON>);
 
-    // Suppress warnings for missing POI sprite icons (common with OpenFreeMap styles)
-    map.on("styleimagemissing", () => {
-      // no-op: the style references icons not included in the sprite sheet
+      const visible = buildVisibleCoordinates(
+        frameData.frames,
+        frame.elapsedMs,
+      );
+      const allCoords = visible.map((v) => v.lonLat);
+      const bounds = computeBounds(allCoords);
+
+      if (bounds) {
+        const lngLatBounds = new maplibregl.LngLatBounds(bounds.sw, bounds.ne);
+        map.fitBounds(lngLatBounds, {
+          padding: Math.max(lineWidth, 20),
+          duration: 0,
+          maxZoom: 17,
+        });
+      }
+
+      map.once("idle", () => {
+        continueRender(renderHandle);
+      });
     });
 
     map.on("error", () => {
-      continueRender(initHandle);
+      continueRender(renderHandle);
     });
 
     return () => {
       map.remove();
-      mapRef.current = null;
     };
   }, []);
-
-  // Update route and camera on each frame
-  const [frameHandle] = useState(() =>
-    delayRender(`CityMap frame: ${config.id}`),
-  );
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !mapReady) {
-      continueRender(frameHandle);
-      return;
-    }
-
-    const geojson = buildRouteGeoJSON(frameData.frames, frame.elapsedMs);
-    const source = map.getSource(SOURCE_ID) as maplibregl.GeoJSONSource;
-    if (!source) {
-      continueRender(frameHandle);
-      return;
-    }
-
-    source.setData(geojson as ReturnType<typeof buildRouteGeoJSON>);
-
-    const visible = buildVisibleCoordinates(
-      frameData.frames,
-      frame.elapsedMs,
-    );
-    const allCoords = visible.map((v) => v.lonLat);
-    const bounds = computeBounds(allCoords);
-
-    if (bounds) {
-      const lngLatBounds = new maplibregl.LngLatBounds(bounds.sw, bounds.ne);
-      map.fitBounds(lngLatBounds, {
-        padding: Math.max(lineWidth, 20),
-        duration: 0,
-        maxZoom: 17,
-      });
-    }
-
-    map.once("idle", () => {
-      continueRender(frameHandle);
-    });
-
-    map.once("error", () => {
-      continueRender(frameHandle);
-    });
-  }, [frame.elapsedMs, mapReady, frameData.frames, lineWidth, frameHandle]);
 
   const isWithoutBgc = config.style === "without-bgc";
   const resolvedLabelColor = config.labelColor ?? theme.colors.secondary;
