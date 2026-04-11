@@ -18,6 +18,28 @@
 
 这是一个超轻量级的解决方案，不再需要付费购买甚至订阅任何软件，也不用再去下载一个只为了做这件事但超级不好用的软件。
 
+## Widgets
+
+9 种可自定义的 Widget，每种均支持两种样式预设：**with-bgc**（半透明背景）和 **without-bgc**（透明背景 + 文字发光）。
+
+| 速度 | 心率 | 功率 | 踏频 |
+|------|------|------|------|
+| ![速度](images/widget-speed.png) | ![心率](images/widget-heart-rate.png) | ![功率](images/widget-power.png) | ![踏频](images/widget-cadence.png) |
+
+| 海拔 | 距离 | 时间 |
+|------|------|------|
+| ![海拔](images/widget-elevation.png) | ![距离](images/widget-distance.png) | ![时间](images/widget-time-elapsed.png) |
+
+| 路线简图 | 城市地图 |
+|----------|----------|
+| ![路线简图](images/widget-noodlemap.png) | ![城市地图](images/widget-citymap.png) |
+
+数据类 Widget 均支持 `colorByZone` 模式，以 5 级渐变色显示：
+
+![速度区间](images/widget-speed-zone.png) ![心率区间](images/widget-heart-rate-zone.png) ![功率区间](images/widget-power-zone.png)
+
+所有配置选项详见 [Widget 配置指南](widget-guide_zh-CN.md)。
+
 ## Requirements
 
 - Node.js >= 20
@@ -121,13 +143,7 @@ output/demo-run/
 - 输出分辨率、帧率、时长策略
 - 输出格式：`mov` 或 `png-sequence`
 - 时间同步参数：offset / trim
-- 六个 widget：
-  - `speed`
-  - `heart-rate`
-  - `elevation`
-  - `distance`
-  - `time`
-  - `noodlemap`
+- 9 种 widget：`speed`、`heart-rate`、`power`、`cadence`、`elevation`、`distance`、`time`、`noodlemap`、`citymap`
 - 全局 theme 和每个 widget 的位置、尺寸、基础样式
 
 可直接参考 [examples/sample-config.json](../examples/sample-config.json)。详细的 Widget 配置说明请参考 [Widget 配置指南](widget-guide_zh-CN.md)。
@@ -141,7 +157,7 @@ output/demo-run/
 - `GPX` / `TCX` 输入
 - 配置加载与 Zod 校验
 - 活动归一化、插值、平滑、逐帧数据生成
-- Remotion 渲染六个 widget，其中包含 GPS 轨迹 noodlemap
+- Remotion 渲染 9 种 widget（speed、heart-rate、power、cadence、elevation、distance、time、noodlemap、citymap）
 - 透明 `MOV / ProRes 4444` 导出
 - `--sample` 快速预览、`--concurrency` 并行度控制、`--segments` 分段并行渲染
 - 日志、调试产物、元数据输出
@@ -149,5 +165,4 @@ output/demo-run/
 未来目标：
 
 - 更好看的 widgt，虽然这可能是我最不擅长的事情
-- 功率与踏频 widget
 - 一个线上的 demo，让大家可以更容易的get到这个项目到底在做什么

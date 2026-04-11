@@ -18,6 +18,28 @@ Output examples:
 
 It's a lightweight solution — no paid subscriptions, no clunky software you'll only use once.
 
+## Widgets
+
+9 customizable widgets with two style presets: **with-bgc** (semi-transparent background) and **without-bgc** (transparent with text glow).
+
+| Speed | Heart Rate | Power | Cadence |
+|-------|-----------|-------|---------|
+| ![Speed](docs/images/widget-speed.png) | ![Heart Rate](docs/images/widget-heart-rate.png) | ![Power](docs/images/widget-power.png) | ![Cadence](docs/images/widget-cadence.png) |
+
+| Elevation | Distance | Time |
+|-----------|----------|------|
+| ![Elevation](docs/images/widget-elevation.png) | ![Distance](docs/images/widget-distance.png) | ![Time](docs/images/widget-time-elapsed.png) |
+
+| Noodle Map | City Map |
+|------------|----------|
+| ![Noodle Map](docs/images/widget-noodlemap.png) | ![City Map](docs/images/widget-citymap.png) |
+
+Each data widget supports `colorByZone` mode with a 5-zone color gradient:
+
+![Speed Zone](docs/images/widget-speed-zone.png) ![Heart Rate Zone](docs/images/widget-heart-rate-zone.png) ![Power Zone](docs/images/widget-power-zone.png)
+
+See the [Widget Configuration Guide](docs/widget-guide_en.md) for all options.
+
 ## Requirements
 
 - Node.js >= 20
@@ -122,13 +144,7 @@ The config file currently supports:
 - Output resolution, frame rate, and duration strategy
 - Output format: `mov` or `png-sequence`
 - Time sync parameters: offset / trim
-- Six widgets:
-  - `speed`
-  - `heart-rate`
-  - `elevation`
-  - `distance`
-  - `time`
-  - `noodlemap`
+- 9 widgets: `speed`, `heart-rate`, `power`, `cadence`, `elevation`, `distance`, `time`, `noodlemap`, `citymap`
 - Global theme and per-widget position, size, and styling
 
 See [examples/sample-config.json](examples/sample-config.json) for a working example. For detailed widget configuration, see the [Widget Configuration Guide](docs/widget-guide_en.md).
@@ -142,7 +158,7 @@ Implemented:
 - `GPX` / `TCX` input
 - Config loading with Zod validation
 - Activity normalization, interpolation, smoothing, and per-frame data generation
-- Remotion rendering for six widgets, including a GPS noodle map
+- Remotion rendering for 9 widgets (speed, heart-rate, power, cadence, elevation, distance, time, noodlemap, citymap)
 - Transparent `MOV / ProRes 4444` export
 - `--sample` quick preview, `--concurrency` parallelism control, `--segments` parallel segmented rendering
 - Logging, debug artifacts, and metadata output
@@ -150,5 +166,4 @@ Implemented:
 Roadmap:
 
 - Better-looking widgets (definitely not my strong suit)
-- Power and cadence widgets
 - An online demo so people can quickly understand what this project does

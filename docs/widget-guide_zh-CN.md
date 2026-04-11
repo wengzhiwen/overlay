@@ -11,6 +11,8 @@
 - [各 Widget 详细说明](#各-widget-详细说明)
   - [Speed — 速度](#speed--速度)
   - [Heart Rate — 心率](#heart-rate--心率)
+  - [Power — 功率](#power--功率)
+  - [Cadence — 踏频](#cadence--踏频)
   - [Elevation — 海拔](#elevation--海拔)
   - [Distance — 距离](#distance--距离)
   - [Time — 时间](#time--时间)
@@ -26,7 +28,9 @@
 |--------|-----------|------|
 | Speed | `speed` | 显示当前速度，支持速度区间着色和历史图表 |
 | Heart Rate | `heart-rate` | 显示当前心率，支持心率区间着色和历史图表 |
-| Elevation | `elevation` | 显示当前海拔高度，可选显示累计爬升 |
+| Power | `power` | 显示当前功率，支持功率区间着色和历史图表 |
+| Cadence | `cadence` | 显示当前踏频，支持踏频区间着色和历史图表 |
+| Elevation | `elevation` | 显示当前海拔高度，可选显示累计爬升和坡度着色图表 |
 | Distance | `distance` | 显示累计运动距离 |
 | Time | `time` | 显示运动经过时间或当前时钟时间 |
 | Noodle Map | `noodlemap` | GPS 路线的抽象 2D 投影图（无底图） |
@@ -80,9 +84,11 @@
 |--------|--------|
 | Speed | 5:3 |
 | Heart Rate | 5:3 |
+| Power | 5:3 |
+| Cadence | 5:3 |
 | Elevation | 5:3 |
 | Distance | 5:3 |
-| Time | 2:1 |
+| Time | 5:3 |
 | Noodle Map | 5:3 |
 | City Map | 5:3 |
 
@@ -166,6 +172,10 @@
 
 ![Heart Rate Widget with Zone Colors](images/widget-heart-rate-zone.png)
 
+*without-bgc 样式：*
+
+![Heart Rate Widget without background](images/widget-heart-rate-without-bgc.png)
+
 #### 特有配置项
 
 | 字段 | 类型 | 默认值 | 说明 |
@@ -217,11 +227,123 @@
 
 ---
 
+### Power — 功率
+
+显示当前功率输出（3秒平均，单位瓦特）。支持根据功率区间对数值着色，并可在底部显示功率历史柱状图。
+
+![Power Widget](images/widget-power.png)
+
+*colorByZone 模式：*
+
+![Power Widget with Zone Colors](images/widget-power-zone.png)
+
+*without-bgc 样式：*
+
+![Power Widget without background](images/widget-power-without-bgc.png)
+
+#### 特有配置项
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `showUnit` | `boolean` | `true` | 是否显示 "W" 单位 |
+| `colorByZone` | `boolean` | `false` | 是否根据功率区间着色 |
+| `zones` | `Zone[]` | `[]` | 自定义功率区间 |
+| `showChart` | `boolean \| "auto"` | `"auto"` | 是否显示功率图表。`"auto"` 仅当运动时长超过 60 秒时显示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | 图表时间范围：`short`=60s, `medium`=300s, `long`=1200s |
+
+#### 默认功率区间（Watts）
+
+当 `colorByZone` 启用且未自定义 `zones` 时，使用以下默认区间：
+
+| 区间 | 范围 | 颜色 |
+|------|------|------|
+| Zone 1 | 0 – 150 | `#60a5fa`（蓝色） |
+| Zone 2 | 150 – 200 | `#34d399`（绿色） |
+| Zone 3 | 200 – 250 | `#fbbf24`（黄色） |
+| Zone 4 | 250 – 300 | `#fb923c`（橙色） |
+| Zone 5 | 300+ | `#f87171`（红色） |
+
+上述默认区间以健身骑行设定，竞赛或训练场景建议通过配置自定义区间。
+
+#### 配置示例
+
+```json
+{
+  "id": "power-main",
+  "type": "power",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
+### Cadence — 踏频
+
+显示当前踏频（3秒平均，单位 RPM）。支持根据踏频区间对数值着色，并可在底部显示踏频历史柱状图。
+
+![Cadence Widget](images/widget-cadence.png)
+
+*colorByZone 模式：*
+
+![Cadence Widget with Zone Colors](images/widget-cadence-zone.png)
+
+*without-bgc 样式：*
+
+![Cadence Widget without background](images/widget-cadence-without-bgc.png)
+
+#### 特有配置项
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `showUnit` | `boolean` | `true` | 是否显示 "rpm" 单位 |
+| `colorByZone` | `boolean` | `false` | 是否根据踏频区间着色 |
+| `zones` | `Zone[]` | `[]` | 自定义踏频区间 |
+| `showChart` | `boolean \| "auto"` | `"auto"` | 是否显示踏频图表。`"auto"` 仅当运动时长超过 60 秒时显示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | 图表时间范围：`short`=60s, `medium`=300s, `long`=1200s |
+
+#### 默认踏频区间（RPM）
+
+当 `colorByZone` 启用且未自定义 `zones` 时，使用以下默认区间：
+
+| 区间 | 范围 | 颜色 |
+|------|------|------|
+| Zone 1 | 0 – 70 | `#60a5fa`（蓝色） |
+| Zone 2 | 70 – 80 | `#34d399`（绿色） |
+| Zone 3 | 80 – 90 | `#fbbf24`（黄色） |
+| Zone 4 | 90 – 100 | `#fb923c`（橙色） |
+| Zone 5 | 100+ | `#f87171`（红色） |
+
+#### 配置示例
+
+```json
+{
+  "id": "cadence-main",
+  "type": "cadence",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
 ### Elevation — 海拔
 
-显示当前海拔高度。可选显示累计爬升（Gain）作为次要信息。
+显示当前海拔高度。可选显示累计爬升（Gain）和坡度着色图表。
 
 ![Elevation Widget](images/widget-elevation.png)
+
+*without-bgc 样式：*
+
+![Elevation Widget without background](images/widget-elevation-without-bgc.png)
 
 #### 特有配置项
 
@@ -230,6 +352,10 @@
 | `showAscent` | `boolean` | `false` | 是否显示累计爬升 |
 | `altitudeUnit` | `"m" \| "ft"` | `"m"` | 海拔单位 |
 | `ascentUnit` | `"m" \| "ft"` | `"m"` | 爬升单位 |
+| `colorByGrade` | `boolean` | `false` | 是否根据坡度百分比着色图表 |
+| `gradeThresholds` | `number[4]` | `[3, 5, 8, 10]` | 4 个坡度阈值(%)自动生成 5 个区间 |
+| `showChart` | `boolean \| "auto"` | `"auto"` | 是否显示海拔图表。`"auto"` 仅当运动时长超过 60 秒时显示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | 图表时间范围：`short`=5分钟, `medium`=30分钟, `long`=60分钟 |
 
 #### 配置示例
 

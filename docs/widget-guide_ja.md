@@ -11,6 +11,8 @@
 - [各 Widget の詳細](#各-widget-の詳細)
   - [Speed — スピード](#speed--スピード)
   - [Heart Rate — 心拍数](#heart-rate--心拍数)
+  - [Power — パワー](#power--パワー)
+  - [Cadence — ケイデンス](#cadence--ケイデンス)
   - [Elevation — 標高](#elevation--標高)
   - [Distance — 距離](#distance--距離)
   - [Time — 時間](#time--時間)
@@ -26,7 +28,9 @@
 |--------|----------------|------|
 | Speed | `speed` | 現在のスピードを表示。ゾーンカラーリングと履歴チャートに対応 |
 | Heart Rate | `heart-rate` | 現在の心拍数を表示。ゾーンカラーリングと履歴チャートに対応 |
-| Elevation | `elevation` | 現在の標高を表示。累積獲得標高の表示にも対応 |
+| Power | `power` | 現在のパワーを表示。ゾーンカラーリングと履歴チャートに対応 |
+| Cadence | `cadence` | 現在のケイデンスを表示。ゾーンカラーリングと履歴チャートに対応 |
+| Elevation | `elevation` | 現在の標高を表示。累積獲得標高と勾配カラーチャートに対応 |
 | Distance | `distance` | 累積移動距離を表示 |
 | Time | `time` | 経過時間または現在時刻を表示 |
 | Noodle Map | `noodlemap` | GPS トラックの抽象的な 2D 投影図（地図タイルなし） |
@@ -80,9 +84,11 @@
 |--------|------------|
 | Speed | 5:3 |
 | Heart Rate | 5:3 |
+| Power | 5:3 |
+| Cadence | 5:3 |
 | Elevation | 5:3 |
 | Distance | 5:3 |
-| Time | 2:1 |
+| Time | 5:3 |
 | Noodle Map | 5:3 |
 | City Map | 5:3 |
 
@@ -166,6 +172,10 @@
 
 ![Heart Rate Widget with Zone Colors](images/widget-heart-rate-zone.png)
 
+*without-bgc スタイル：*
+
+![Heart Rate Widget without background](images/widget-heart-rate-without-bgc.png)
+
 #### 個別フィールド
 
 | フィールド | 型 | デフォルト | 説明 |
@@ -217,11 +227,123 @@
 
 ---
 
+### Power — パワー
+
+現在のパワー出力（3秒平均、ワット）を表示します。パワーゾーンによる数値のカラーリングと、パワー履歴のバーチャートに対応しています。
+
+![Power Widget](images/widget-power.png)
+
+*colorByZone モード：*
+
+![Power Widget with Zone Colors](images/widget-power-zone.png)
+
+*without-bgc スタイル：*
+
+![Power Widget without background](images/widget-power-without-bgc.png)
+
+#### 個別フィールド
+
+| フィールド | 型 | デフォルト | 説明 |
+|------------|------|----------|------|
+| `showUnit` | `boolean` | `true` | "W" 単位の表示/非表示 |
+| `colorByZone` | `boolean` | `false` | パワーゾーンによるカラーリングの有効/無効 |
+| `zones` | `Zone[]` | `[]` | カスタムパワーゾーン |
+| `showChart` | `boolean \| "auto"` | `"auto"` | パワーチャートの表示。`"auto"` はアクティビティが60秒を超える場合に表示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | チャートの時間範囲：`short`=60秒, `medium`=300秒, `long`=1200秒 |
+
+#### デフォルトのパワーゾーン（Watts）
+
+`colorByZone` を有効にし、カスタム `zones` を指定しない場合のデフォルト：
+
+| ゾーン | 範囲 | 色 |
+|--------|------|----|
+| Zone 1 | 0 – 150 | `#60a5fa`（青） |
+| Zone 2 | 150 – 200 | `#34d399`（緑） |
+| Zone 3 | 200 – 250 | `#fbbf24`（黄） |
+| Zone 4 | 250 – 300 | `#fb923c`（オレンジ） |
+| Zone 5 | 300+ | `#f87171`（赤） |
+
+これらのデフォルト値はリクリエーショナルサイクリングを基準に設定されています。レースやトレーニング専用のパワーゾーンにはカスタマイズを推奨します。
+
+#### 設定例
+
+```json
+{
+  "id": "power-main",
+  "type": "power",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
+### Cadence — ケイデンス
+
+現在のケイデンス（3秒平均、RPM）を表示します。ケイデンスゾーンによる数値のカラーリングと、履歴バーチャートに対応しています。
+
+![Cadence Widget](images/widget-cadence.png)
+
+*colorByZone モード：*
+
+![Cadence Widget with Zone Colors](images/widget-cadence-zone.png)
+
+*without-bgc スタイル：*
+
+![Cadence Widget without background](images/widget-cadence-without-bgc.png)
+
+#### 個別フィールド
+
+| フィールド | 型 | デフォルト | 説明 |
+|------------|------|----------|------|
+| `showUnit` | `boolean` | `true` | "rpm" 単位の表示/非表示 |
+| `colorByZone` | `boolean` | `false` | ケイデンスゾーンによるカラーリングの有効/無効 |
+| `zones` | `Zone[]` | `[]` | カスタムケイデンスゾーン |
+| `showChart` | `boolean \| "auto"` | `"auto"` | ケイデンスチャートの表示。`"auto"` はアクティビティが60秒を超える場合に表示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | チャートの時間範囲：`short`=60秒, `medium`=300秒, `long`=1200秒 |
+
+#### デフォルトのケイデンスゾーン（RPM）
+
+`colorByZone` を有効にし、カスタム `zones` を指定しない場合のデフォルト：
+
+| ゾーン | 範囲 | 色 |
+|--------|------|----|
+| Zone 1 | 0 – 70 | `#60a5fa`（青） |
+| Zone 2 | 70 – 80 | `#34d399`（緑） |
+| Zone 3 | 80 – 90 | `#fbbf24`（黄） |
+| Zone 4 | 90 – 100 | `#fb923c`（オレンジ） |
+| Zone 5 | 100+ | `#f87171`（赤） |
+
+#### 設定例
+
+```json
+{
+  "id": "cadence-main",
+  "type": "cadence",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
 ### Elevation — 標高
 
-現在の標高を表示します。累積獲得標高（Gain）を副情報として表示することも可能です。
+現在の標高を表示します。累積獲得標高（Gain）と勾配カラーチャートに対応しています。
 
 ![Elevation Widget](images/widget-elevation.png)
+
+*without-bgc スタイル：*
+
+![Elevation Widget without background](images/widget-elevation-without-bgc.png)
 
 #### 個別フィールド
 
@@ -230,6 +352,10 @@
 | `showAscent` | `boolean` | `false` | 累積獲得標高の表示 |
 | `altitudeUnit` | `"m" \| "ft"` | `"m"` | 標高の単位 |
 | `ascentUnit` | `"m" \| "ft"` | `"m"` | 獲得標高の単位 |
+| `colorByGrade` | `boolean` | `false` | 勾配パーセントによるチャートのカラーリング |
+| `gradeThresholds` | `number[4]` | `[3, 5, 8, 10]` | 4つの勾配閾値(%)で5つのゾーンを自動生成 |
+| `showChart` | `boolean \| "auto"` | `"auto"` | 標高チャートの表示。`"auto"` はアクティビティが60秒を超える場合に表示 |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | チャートの時間範囲：`short`=5分, `medium`=30分, `long`=60分 |
 
 #### 設定例
 

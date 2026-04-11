@@ -26,7 +26,9 @@ This document covers all Widget types supported by the Overlay generator and the
 |--------|------|-------------|
 | Speed | `speed` | Current speed with optional zone coloring and history chart |
 | Heart Rate | `heart-rate` | Current heart rate with optional zone coloring and history chart |
-| Elevation | `elevation` | Current altitude with optional cumulative ascent |
+| Power | `power` | Current power output with optional zone coloring and history chart |
+| Cadence | `cadence` | Current cadence with optional zone coloring and history chart |
+| Elevation | `elevation` | Current altitude with optional cumulative ascent and grade coloring |
 | Distance | `distance` | Cumulative distance traveled |
 | Time | `time` | Elapsed time, clock time, or both |
 | Noodle Map | `noodlemap` | Abstract 2D GPS track projection (no map tiles) |
@@ -80,9 +82,11 @@ Each widget has a fixed aspect ratio derived from `scale`:
 |--------|-------------|
 | Speed | 5:3 |
 | Heart Rate | 5:3 |
+| Power | 5:3 |
+| Cadence | 5:3 |
 | Elevation | 5:3 |
 | Distance | 5:3 |
-| Time | 2:1 |
+| Time | 5:3 |
 | Noodle Map | 5:3 |
 | City Map | 5:3 |
 
@@ -217,11 +221,123 @@ Since everyone's training methodology differs, the system provides flexible zone
 
 ---
 
+### Power
+
+Displays the current power output (Watts, 3-second average). Supports zone-based value coloring and a history chart.
+
+![Power Widget](images/widget-power.png)
+
+*colorByZone mode:*
+
+![Power Widget with Zone Colors](images/widget-power-zone.png)
+
+*without-bgc style:*
+
+![Power Widget without background](images/widget-power-without-bgc.png)
+
+#### Specific Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `showUnit` | `boolean` | `true` | Whether to show the "W" unit |
+| `colorByZone` | `boolean` | `false` | Color the value by power zone |
+| `zones` | `Zone[]` | `[]` | Custom power zones |
+| `showChart` | `boolean \| "auto"` | `"auto"` | Show power chart. `"auto"` shows chart when activity > 60 s |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | Chart time range: `short`=60s, `medium`=300s, `long`=1200s |
+
+#### Default Power Zones (Watts)
+
+When `colorByZone` is enabled with no custom `zones`:
+
+| Zone | Range | Color |
+|------|-------|-------|
+| Zone 1 | 0 – 150 | `#60a5fa` (blue) |
+| Zone 2 | 150 – 200 | `#34d399` (green) |
+| Zone 3 | 200 – 250 | `#fbbf24` (yellow) |
+| Zone 4 | 250 – 300 | `#fb923c` (orange) |
+| Zone 5 | 300+ | `#f87171` (red) |
+
+These defaults are designed around recreational cycling. For racing or training-specific power zones, customize via `zones` or `zoneThresholds`.
+
+#### Example
+
+```json
+{
+  "id": "power-main",
+  "type": "power",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
+### Cadence
+
+Displays the current cadence (RPM, 3-second average). Supports zone-based value coloring and a history chart.
+
+![Cadence Widget](images/widget-cadence.png)
+
+*colorByZone mode:*
+
+![Cadence Widget with Zone Colors](images/widget-cadence-zone.png)
+
+*without-bgc style:*
+
+![Cadence Widget without background](images/widget-cadence-without-bgc.png)
+
+#### Specific Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `showUnit` | `boolean` | `true` | Whether to show the "rpm" unit |
+| `colorByZone` | `boolean` | `false` | Color the value by cadence zone |
+| `zones` | `Zone[]` | `[]` | Custom cadence zones |
+| `showChart` | `boolean \| "auto"` | `"auto"` | Show cadence chart. `"auto"` shows chart when activity > 60 s |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | Chart time range: `short`=60s, `medium`=300s, `long`=1200s |
+
+#### Default Cadence Zones (RPM)
+
+When `colorByZone` is enabled with no custom `zones`:
+
+| Zone | Range | Color |
+|------|-------|-------|
+| Zone 1 | 0 – 70 | `#60a5fa` (blue) |
+| Zone 2 | 70 – 80 | `#34d399` (green) |
+| Zone 3 | 80 – 90 | `#fbbf24` (yellow) |
+| Zone 4 | 90 – 100 | `#fb923c` (orange) |
+| Zone 5 | 100+ | `#f87171` (red) |
+
+#### Example
+
+```json
+{
+  "id": "cadence-main",
+  "type": "cadence",
+  "x": 390,
+  "y": 760,
+  "scale": 0.146,
+  "colorByZone": true,
+  "showChart": "auto",
+  "chartRange": "medium"
+}
+```
+
+---
+
 ### Elevation
 
-Displays the current altitude. Optionally shows cumulative elevation gain.
+Displays the current altitude. Optionally shows cumulative elevation gain and a grade-colored chart.
 
 ![Elevation Widget](images/widget-elevation.png)
+
+*without-bgc style:*
+
+![Elevation Widget without background](images/widget-elevation-without-bgc.png)
 
 #### Specific Fields
 
@@ -230,6 +346,10 @@ Displays the current altitude. Optionally shows cumulative elevation gain.
 | `showAscent` | `boolean` | `false` | Show cumulative ascent |
 | `altitudeUnit` | `"m" \| "ft"` | `"m"` | Altitude unit |
 | `ascentUnit` | `"m" \| "ft"` | `"m"` | Ascent unit |
+| `colorByGrade` | `boolean` | `false` | Color the chart bars by road grade percentage |
+| `gradeThresholds` | `number[4]` | `[3, 5, 8, 10]` | 4 grade thresholds (%) → 5 auto-generated zones |
+| `showChart` | `boolean \| "auto"` | `"auto"` | Show elevation chart. `"auto"` shows chart when activity > 60 s |
+| `chartRange` | `"short" \| "medium" \| "long"` | `"medium"` | Chart time range: `short`=5min, `medium`=30min, `long`=60min |
 
 #### Example
 
