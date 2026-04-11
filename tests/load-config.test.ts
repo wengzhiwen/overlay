@@ -8,7 +8,7 @@ describe("loadOverlayConfig", () => {
 
     expect(config.render.width).toBe(1920);
     expect(config.render.output.format).toBe("mov");
-    expect(config.widgets).toHaveLength(7);
+    expect(config.widgets).toHaveLength(8);
     expect(config.debug.dumpFrameData).toBe(true);
   });
 });

@@ -57,13 +57,52 @@
       "chartRange": "medium"
     },
     {
-      "id": "distance-bottom-right",
-      "type": "distance",
+      "id": "cadence-row2-left",
+      "type": "cadence",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 60,
+      "y": 316,
+      "scale": 0.333,
+      "colorByZone": true,
+      "showChart": "auto",
+      "chartRange": "medium"
+    },
+    {
+      "id": "power-row2-right",
+      "type": "power",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 660,
+      "y": 316,
+      "scale": 0.333,
+      "colorByZone": true,
+      "showChart": "auto",
+      "chartRange": "medium"
+    },
+    {
+      "id": "citymap-bottom-left",
+      "type": "citymap",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 60,
+      "y": 1340,
+      "scale": 0.278,
+      "lineColor": "#34d399",
+      "lineWeight": "M"
+    },
+    {
+      "id": "elevation-above-distance",
+      "type": "elevation",
       "enabled": true,
       "style": "without-bgc",
       "x": 720,
-      "y": 1540,
+      "y": 1340,
       "scale": 0.278,
+      "showAscent": true,
+      "colorByGrade": true,
+      "showChart": true,
+      "chartRange": "long",
       "valueFontSize": 34,
       "labelFontSize": 16,
       "unitFontSize": 16
@@ -80,15 +119,16 @@
       "lineWeight": "M"
     },
     {
-      "id": "citymap-bottom-left",
-      "type": "citymap",
+      "id": "distance-bottom-right",
+      "type": "distance",
       "enabled": true,
       "style": "without-bgc",
-      "x": 60,
-      "y": 1340,
+      "x": 720,
+      "y": 1540,
       "scale": 0.278,
-      "lineColor": "#34d399",
-      "lineWeight": "M"
+      "valueFontSize": 34,
+      "labelFontSize": 16,
+      "unitFontSize": 16
     },
     {
       "id": "time-bottom-right",

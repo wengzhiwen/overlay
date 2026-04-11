@@ -3,7 +3,8 @@
     "width": 1920,
     "height": 1080,
     "fps": 1,
-    "durationStrategy": "activity",
+    "durationStrategy": "fixed",
+    "durationMs": 1200000,
     "output": {
       "format": "mov",
       "codec": "prores",
@@ -28,43 +29,25 @@
   },
   "widgets": [
     {
-      "id": "speed-row1",
+      "id": "test-speed",
       "type": "speed",
       "enabled": true,
       "style": "without-bgc",
-      "x": 40,
-      "y": 40,
-      "scale": 0.2
-    },
-    {
-      "id": "elevation-row1",
-      "type": "elevation",
-      "enabled": true,
-      "style": "without-bgc",
-      "x": 529,
-      "y": 40,
-      "scale": 0.2,
-      "colorByGrade": true,
+      "x": 30,
+      "y": 10,
+      "scale": 0.1,
+      "colorByZone": true,
       "showChart": true,
-      "chartRange": "long"
+      "chartRange": "medium"
     },
     {
-      "id": "distance-row1",
-      "type": "distance",
-      "enabled": true,
-      "style": "without-bgc",
-      "x": 1018,
-      "y": 40,
-      "scale": 0.2
-    },
-    {
-      "id": "heart-rate-row1",
+      "id": "test-heart-rate",
       "type": "heart-rate",
       "enabled": true,
       "style": "without-bgc",
-      "x": 1506,
-      "y": 40,
-      "scale": 0.2,
+      "x": 30,
+      "y": 130,
+      "scale": 0.1,
       "colorByZone": true,
       "zones": [
         { "max": 106, "color": "#94a3b8" },
@@ -74,54 +57,83 @@
         { "min": 158, "max": 166, "color": "#fb923c" },
         { "min": 166, "color": "#f87171" }
       ],
-      "showChart": "auto",
+      "showChart": true,
       "chartRange": "medium"
     },
     {
-      "id": "power-row2",
+      "id": "test-power",
       "type": "power",
       "enabled": true,
       "style": "without-bgc",
-      "x": 40,
-      "y": 290,
-      "scale": 0.2,
+      "x": 30,
+      "y": 250,
+      "scale": 0.1,
       "colorByZone": true,
-      "showChart": "auto",
+      "showChart": true,
       "chartRange": "medium"
     },
     {
-      "id": "cadence-row2",
+      "id": "test-cadence",
       "type": "cadence",
       "enabled": true,
       "style": "without-bgc",
-      "x": 1506,
-      "y": 290,
-      "scale": 0.2,
+      "x": 30,
+      "y": 370,
+      "scale": 0.1,
       "colorByZone": true,
-      "showChart": "auto",
+      "showChart": true,
       "chartRange": "medium"
     },
     {
-      "id": "time-bottom-left",
+      "id": "test-elevation",
+      "type": "elevation",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 30,
+      "y": 490,
+      "scale": 0.1,
+      "showAscent": true,
+      "colorByGrade": true,
+      "showChart": true,
+      "chartRange": "medium"
+    },
+    {
+      "id": "test-distance",
+      "type": "distance",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 30,
+      "y": 610,
+      "scale": 0.1
+    },
+    {
+      "id": "test-time",
       "type": "time",
       "enabled": true,
       "style": "without-bgc",
-      "x": 40,
-      "y": 810,
-      "scale": 0.2,
+      "x": 30,
+      "y": 730,
+      "scale": 0.1,
       "mode": "both",
       "timezone": "Asia/Singapore"
     },
     {
-      "id": "citymap-bottom-right",
+      "id": "test-noodlemap",
+      "type": "noodlemap",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 30,
+      "y": 831,
+      "scale": 0.1
+    },
+    {
+      "id": "test-citymap",
       "type": "citymap",
       "enabled": true,
       "style": "without-bgc",
-      "x": 1506,
-      "y": 810,
-      "scale": 0.2,
-      "lineColor": "#34d399",
-      "lineWeight": "M"
+      "x": 30,
+      "y": 951,
+      "scale": 0.1
     }
   ],
   "debug": {
