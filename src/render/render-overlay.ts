@@ -13,6 +13,7 @@ import { SNAPSHOT_INTERVAL_MS } from "../domain/frame-data.js";
 import type { FrameDataMeta } from "../remotion/Root.js";
 import { loadActivity } from "../parsers/activity-loader.js";
 import { buildFrameData } from "../preprocess/build-frame-data.js";
+import type { ElevationHistoryPoint } from "../domain/frame-data.js";
 import { detectGaps } from "../preprocess/detect-gaps.js";
 import { deriveMetrics } from "../preprocess/derive-metrics.js";
 import { fillShortGaps } from "../preprocess/fill-gaps.js";
@@ -881,6 +882,7 @@ export const renderOverlay = async (
   // build frame data → write frame data → render.
   const renderOutputs: Array<{ path: string; startedAt: string | undefined; durationSeconds: number }> = [];
   let cumulativeElapsedOffsetMs = 0;
+  let cumulativeElevationHistory: ElevationHistoryPoint[] = [];
   let remainingRenderBudgetMs = request.maxDurationMs;
 
   for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
@@ -957,6 +959,7 @@ export const renderOverlay = async (
         const built = await buildFrameData(processedActivity, config, {
           elapsedOffsetMs: cumulativeElapsedOffsetMs,
           maxDurationMs: remainingRenderBudgetMs,
+          elevationHistory: cumulativeElevationHistory,
         });
         logger.info(
           `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
@@ -1134,6 +1137,7 @@ export const renderOverlay = async (
       remainingRenderBudgetMs,
       (frameData.durationInFrames / frameData.fps) * 1000,
     );
+    cumulativeElevationHistory = frameData.elevationHistory;
     cumulativeElapsedOffsetMs += processedActivity.summary.durationMs ?? 0;
     if (segmentIndex < activitySegments.length - 1) {
       cumulativeElapsedOffsetMs += SNAPSHOT_INTERVAL_MS;

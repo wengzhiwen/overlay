@@ -7,16 +7,45 @@ import {
   type FrameData,
   type FrameSnapshot,
 } from "../../domain/frame-data.js";
-import type { FrameDataMeta } from "../Root.js";
 import { defaultTheme, mergeThemeWithConfig } from "../theme/default.js";
 import { CityMapWidget } from "../widgets/CityMapWidget.js";
+import { CadenceWidget } from "../widgets/CadenceWidget.js";
 import { DistanceWidget } from "../widgets/DistanceWidget.js";
 import { ElevationWidget } from "../widgets/ElevationWidget.js";
 import { HeartRateWidget } from "../widgets/HeartRateWidget.js";
 import { NoodleMapWidget } from "../widgets/NoodleMapWidget.js";
+import { PowerWidget } from "../widgets/PowerWidget.js";
 import { SpeedWidget } from "../widgets/SpeedWidget.js";
 import { TimeWidget } from "../widgets/TimeWidget.js";
-import { hasGpsTrack } from "../widgets/noodleMapShared.js";
+import type { FrameDataMeta } from "../Root.js";
+
+// Scan all frames once to determine which metrics are present in the activity.
+const computeAvailableMetrics = (frames: FrameSnapshot[]): Set<string> => {
+  const available = new Set<string>();
+
+  for (const frame of frames) {
+    const m = frame.metrics;
+    if (m.speedMps !== undefined) available.add("speedMps");
+    if (m.heartRateBpm !== undefined) available.add("heartRateBpm");
+    if (m.powerW !== undefined) available.add("powerW");
+    if (m.cadenceRpm !== undefined) available.add("cadenceRpm");
+    if (m.altitudeM !== undefined) available.add("altitudeM");
+    if (m.distanceM !== undefined) available.add("distanceM");
+    if (frame.position !== undefined) available.add("position");
+  }
+
+  return available;
+};
+
+// Map each widget type to the metric it requires. Unmapped types (time) always render.
+const REQUIRED_METRIC: Record<string, string> = {
+  speed: "speedMps",
+  "heart-rate": "heartRateBpm",
+  power: "powerW",
+  cadence: "cadenceRpm",
+  elevation: "altitudeM",
+  distance: "distanceM",
+};
 
 const FRAME_DATA_URL = "/frame-data.json";
 
@@ -30,6 +59,7 @@ const renderWidget = (
   frameData: FrameData,
   frameIndex: number,
   overlayConfig: OverlayConfig,
+  availableMetrics: Set<string>,
 ) => {
   const frame = getSnapshotForRenderFrame(frameData, frameIndex);
   const theme = mergeThemeWithConfig(defaultTheme, overlayConfig.theme);
@@ -38,11 +68,14 @@ const renderWidget = (
     return null;
   }
 
-  if (widget.type === "noodlemap" && !hasGpsTrack(frameData.frames)) {
+  // Hide data widgets when their metric is absent from the entire activity.
+  const requiredMetric = REQUIRED_METRIC[widget.type];
+  if (requiredMetric && !availableMetrics.has(requiredMetric)) {
     return null;
   }
 
-  if (widget.type === "citymap" && !hasGpsTrack(frameData.frames)) {
+  // Map widgets require GPS position data.
+  if ((widget.type === "noodlemap" || widget.type === "citymap") && !availableMetrics.has("position")) {
     return null;
   }
 
@@ -54,6 +87,10 @@ const renderWidget = (
       return <SpeedWidget key={widget.id} {...baseProps} config={widget} />;
     case "heart-rate":
       return <HeartRateWidget key={widget.id} {...baseProps} config={widget} />;
+    case "power":
+      return <PowerWidget key={widget.id} {...baseProps} config={widget} />;
+    case "cadence":
+      return <CadenceWidget key={widget.id} {...baseProps} config={widget} />;
     case "elevation":
       return <ElevationWidget key={widget.id} {...baseProps} config={widget} />;
     case "distance":
@@ -100,10 +137,12 @@ export const OverlayComposition = ({
     frames,
   };
 
+  const availableMetrics = computeAvailableMetrics(frames);
+
   return (
     <AbsoluteFill style={{ backgroundColor: "transparent" }}>
       {overlayConfig.widgets.map((widget) =>
-        renderWidget(widget, frameData, frame, overlayConfig),
+        renderWidget(widget, frameData, frame, overlayConfig, availableMetrics),
       )}
     </AbsoluteFill>
   );

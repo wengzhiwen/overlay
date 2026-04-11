@@ -20,6 +20,12 @@ export type FrameSnapshot = {
   clockTimeIso: string | undefined;
 };
 
+export type ElevationHistoryPoint = {
+  displayElapsedMs: number;
+  altitudeM: number | undefined;
+  distanceM: number | undefined;
+};
+
 export type FrameData = {
   width: number;
   height: number;
@@ -28,6 +34,9 @@ export type FrameData = {
   snapshotIntervalMs: number;
   frames: FrameSnapshot[];
   heartRateZones: ActivityZone[];
+  powerZones: ActivityZone[];
+  cadenceZones: ActivityZone[];
+  elevationHistory: ElevationHistoryPoint[];
   activityDurationMs: number;
 };
 

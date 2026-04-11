@@ -2,6 +2,7 @@ import type { OverlayConfig } from "../config/schema.js";
 import type { Activity, ActivitySample } from "../domain/activity.js";
 import {
   SNAPSHOT_INTERVAL_MS,
+  type ElevationHistoryPoint,
   type FrameData,
   type FrameSnapshot,
 } from "../domain/frame-data.js";
@@ -53,6 +54,7 @@ export const buildFrameData = async (
   options?: {
     maxDurationMs?: number | undefined;
     elapsedOffsetMs?: number | undefined;
+    elevationHistory?: ElevationHistoryPoint[] | undefined;
   },
 ): Promise<FrameData> => {
   const baseDurationMs = getEffectiveDurationMs(activity, config);
@@ -116,6 +118,15 @@ export const buildFrameData = async (
     },
   );
 
+  // Build current segment's elevation history points.
+  const currentElevationHistory: ElevationHistoryPoint[] = frames
+    .filter((f) => f.isActive)
+    .map((f) => ({
+      displayElapsedMs: f.displayElapsedMs,
+      altitudeM: f.metrics.altitudeM,
+      distanceM: f.metrics.distanceM,
+    }));
+
   return {
     width: config.render.width,
     height: config.render.height,
@@ -124,6 +135,12 @@ export const buildFrameData = async (
     snapshotIntervalMs: SNAPSHOT_INTERVAL_MS,
     frames,
     heartRateZones: activity.zones.heartRate,
+    powerZones: activity.zones.power,
+    cadenceZones: activity.zones.cadence,
+    elevationHistory: [
+      ...(options?.elevationHistory ?? []),
+      ...currentElevationHistory,
+    ],
     activityDurationMs: activity.summary.durationMs ?? 0,
   };
 };

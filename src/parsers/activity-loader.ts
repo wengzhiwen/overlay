@@ -332,6 +332,8 @@ export const loadActivity = async (filePath: string): Promise<Activity> => {
           color: zone.color,
           label: zone.name,
         })) ?? [],
+      power: [],
+      cadence: [],
     },
     summary: {
       durationMs: summaryDurationMs,

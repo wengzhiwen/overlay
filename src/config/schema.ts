@@ -7,6 +7,8 @@ export const OutputFormatSchema = z.enum(["mov", "png-sequence"]);
 export const WidgetTypeSchema = z.enum([
   "speed",
   "heart-rate",
+  "power",
+  "cadence",
   "elevation",
   "distance",
   "time",
@@ -65,11 +67,33 @@ const HeartRateWidgetSchema = BaseWidgetSchema.extend({
   chartRange: z.enum(["short", "medium", "long"]).default("medium"),
 });
 
+const PowerWidgetSchema = BaseWidgetSchema.extend({
+  type: z.literal("power"),
+  showUnit: z.boolean().default(true),
+  colorByZone: z.boolean().default(false),
+  zones: z.array(ZoneSchema).default([]),
+  showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
+  chartRange: z.enum(["short", "medium", "long"]).default("medium"),
+});
+
+const CadenceWidgetSchema = BaseWidgetSchema.extend({
+  type: z.literal("cadence"),
+  showUnit: z.boolean().default(true),
+  colorByZone: z.boolean().default(false),
+  zones: z.array(ZoneSchema).default([]),
+  showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
+  chartRange: z.enum(["short", "medium", "long"]).default("medium"),
+});
+
 const ElevationWidgetSchema = BaseWidgetSchema.extend({
   type: z.literal("elevation"),
   showAscent: z.boolean().default(false),
   altitudeUnit: z.enum(["m", "ft"]).default("m"),
   ascentUnit: z.enum(["m", "ft"]).default("m"),
+  colorByGrade: z.boolean().default(false),
+  gradeThresholds: z.array(z.number().finite()).length(4).optional(),
+  showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
+  chartRange: z.enum(["short", "medium", "long"]).default("medium"),
 });
 
 const DistanceWidgetSchema = BaseWidgetSchema.extend({
@@ -105,6 +129,8 @@ const CityMapWidgetSchema = BaseWidgetSchema.extend({
 export const WidgetConfigSchema = z.discriminatedUnion("type", [
   SpeedWidgetSchema,
   HeartRateWidgetSchema,
+  PowerWidgetSchema,
+  CadenceWidgetSchema,
   ElevationWidgetSchema,
   DistanceWidgetSchema,
   TimeWidgetSchema,
@@ -116,9 +142,11 @@ export const WidgetConfigSchema = z.discriminatedUnion("type", [
 const WIDGET_ASPECT_RATIOS: Record<string, number> = {
   speed: 5 / 3,
   "heart-rate": 5 / 3,
+  power: 5 / 3,
+  cadence: 5 / 3,
   elevation: 5 / 3,
   distance: 5 / 3,
-  time: 2,
+  time: 5 / 3,
   noodlemap: 5 / 3,
   citymap: 5 / 3,
 };
@@ -176,6 +204,8 @@ export const OverlayConfigSchema = z
         interpolateMissingSamples: z.boolean().default(true),
         speedSmoothingSeconds: z.number().int().min(1).max(15).default(3),
         heartRateSmoothingSeconds: z.number().int().min(1).max(15).default(3),
+        powerSmoothingSeconds: z.number().int().min(1).max(15).default(3),
+        cadenceSmoothingSeconds: z.number().int().min(1).max(15).default(3),
         altitudeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
         gradeSmoothingSeconds: z.number().int().min(1).max(15).default(5),
       })
@@ -183,6 +213,8 @@ export const OverlayConfigSchema = z
         interpolateMissingSamples: true,
         speedSmoothingSeconds: 3,
         heartRateSmoothingSeconds: 3,
+        powerSmoothingSeconds: 3,
+        cadenceSmoothingSeconds: 3,
         altitudeSmoothingSeconds: 5,
         gradeSmoothingSeconds: 5,
       }),

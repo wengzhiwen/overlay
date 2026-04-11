@@ -55,6 +55,16 @@ export const smoothActivity = async (
     config.preprocess.heartRateSmoothingSeconds,
     gapIndices,
   );
+  const power = movingAverage(
+    activity.samples.map((sample) => sample.powerW),
+    config.preprocess.powerSmoothingSeconds,
+    gapIndices,
+  );
+  const cadence = movingAverage(
+    activity.samples.map((sample) => sample.cadenceRpm),
+    config.preprocess.cadenceSmoothingSeconds,
+    gapIndices,
+  );
   const altitude = movingAverage(
     activity.samples.map((sample) => sample.altitudeM),
     config.preprocess.altitudeSmoothingSeconds,
@@ -72,6 +82,8 @@ export const smoothActivity = async (
       ...sample,
       speedMps: speed[index],
       heartRateBpm: heartRate[index],
+      powerW: power[index],
+      cadenceRpm: cadence[index],
       altitudeM: altitude[index],
       gradePct: grade[index],
     })),

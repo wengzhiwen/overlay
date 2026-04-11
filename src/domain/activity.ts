@@ -43,6 +43,8 @@ export type Activity = {
   warnings: string[];
   zones: {
     heartRate: ActivityZone[];
+    power: ActivityZone[];
+    cadence: ActivityZone[];
   };
   summary: {
     durationMs: number | undefined;
