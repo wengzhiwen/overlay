@@ -38,6 +38,7 @@ export type FrameData = {
   cadenceZones: ActivityZone[];
   elevationHistory: ElevationHistoryPoint[];
   activityDurationMs: number;
+  maxSpeed10sAvgMps: number | undefined;
 };
 
 const clampSnapshotIndex = (

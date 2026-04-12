@@ -17,6 +17,7 @@ export type FrameDataMeta = {
   cadenceZones: ActivityZone[];
   elevationHistory: ElevationHistoryPoint[];
   activityDurationMs: number;
+  maxSpeed10sAvgMps: number | undefined;
 };
 
 export type RemotionInputProps = {
@@ -35,6 +36,7 @@ const DEFAULT_FRAME_DATA_META: FrameDataMeta = {
   cadenceZones: [],
   elevationHistory: [],
   activityDurationMs: 0,
+  maxSpeed10sAvgMps: undefined,
 };
 
 const getCompositionProps = (): RemotionInputProps => {

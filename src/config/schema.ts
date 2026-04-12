@@ -14,6 +14,7 @@ export const WidgetTypeSchema = z.enum([
   "time",
   "noodlemap",
   "citymap",
+  "speed-gauge",
 ]);
 
 const ZoneSchema = z.object({
@@ -56,6 +57,21 @@ const SpeedWidgetSchema = BaseWidgetSchema.extend({
   zoneThresholds: z.array(z.number().finite()).length(4).optional(),
   showChart: z.union([z.boolean(), z.literal("auto")]).default("auto"),
   chartRange: z.enum(["short", "medium", "long"]).default("medium"),
+});
+
+const SpeedGaugeWidgetSchema = BaseWidgetSchema.extend({
+  type: z.literal("speed-gauge"),
+  precision: z.number().int().min(0).max(3).default(1),
+  unit: z.enum(["km/h", "mph"]).default("km/h"),
+  showUnit: z.boolean().default(true),
+  colorByZone: z.boolean().default(false),
+  zones: z.array(ZoneSchema).default([]),
+  zoneThresholds: z.array(z.number().finite()).length(4).optional(),
+  bezelColor: z.string().default("#c0a060"),
+  needleColor: z.string().default("#e03030"),
+  dialColor: z.string().default("#1a1a2e"),
+  accentColor: z.string().default("#c0a060"),
+  tickLabelColor: z.string().default("#c0c0c0"),
 });
 
 const HeartRateWidgetSchema = BaseWidgetSchema.extend({
@@ -128,6 +144,7 @@ const CityMapWidgetSchema = BaseWidgetSchema.extend({
 
 export const WidgetConfigSchema = z.discriminatedUnion("type", [
   SpeedWidgetSchema,
+  SpeedGaugeWidgetSchema,
   HeartRateWidgetSchema,
   PowerWidgetSchema,
   CadenceWidgetSchema,
@@ -141,6 +158,7 @@ export const WidgetConfigSchema = z.discriminatedUnion("type", [
 // Per-widget-type aspect ratios (width / height)
 const WIDGET_ASPECT_RATIOS: Record<string, number> = {
   speed: 5 / 3,
+  "speed-gauge": 5 / 3,
   "heart-rate": 5 / 3,
   power: 5 / 3,
   cadence: 5 / 3,

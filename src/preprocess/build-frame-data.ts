@@ -6,6 +6,34 @@ import {
   type FrameData,
   type FrameSnapshot,
 } from "../domain/frame-data.js";
+import { movingAverage } from "./smooth.js";
+
+const computeMaxSpeed10sAvg = (
+  samples: ActivitySample[],
+): number | undefined => {
+  if (samples.length === 0) {
+    return undefined;
+  }
+
+  const gapIndices = new Set<number>();
+  samples.forEach((sample, index) => {
+    if (sample.isDataGap) {
+      gapIndices.add(index);
+    }
+  });
+
+  const speedValues = samples.map((sample) => sample.speedMps);
+  const smoothed = movingAverage(speedValues, 10, gapIndices);
+
+  let max: number | undefined;
+  for (const value of smoothed) {
+    if (value !== undefined && (max === undefined || value > max)) {
+      max = value;
+    }
+  }
+
+  return max;
+};
 
 const getSampleAtElapsedMs = (
   samples: ActivitySample[],
@@ -127,6 +155,9 @@ export const buildFrameData = async (
       distanceM: f.metrics.distanceM,
     }));
 
+  // Compute max 10-second rolling average speed for speed-gauge widget.
+  const maxSpeed10sAvgMps = computeMaxSpeed10sAvg(activity.samples);
+
   return {
     width: config.render.width,
     height: config.render.height,
@@ -142,5 +173,6 @@ export const buildFrameData = async (
       ...currentElevationHistory,
     ],
     activityDurationMs: activity.summary.durationMs ?? 0,
+    maxSpeed10sAvgMps,
   };
 };

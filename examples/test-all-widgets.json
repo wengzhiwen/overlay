@@ -134,6 +134,16 @@
       "x": 30,
       "y": 951,
       "scale": 0.1
+    },
+    {
+      "id": "test-speed-gauge",
+      "type": "speed-gauge",
+      "enabled": true,
+      "style": "without-bgc",
+      "x": 250,
+      "y": 10,
+      "scale": 0.15,
+      "colorByZone": true
     }
   ],
   "debug": {

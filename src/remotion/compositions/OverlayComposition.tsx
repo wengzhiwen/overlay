@@ -15,6 +15,7 @@ import { ElevationWidget } from "../widgets/ElevationWidget.js";
 import { HeartRateWidget } from "../widgets/HeartRateWidget.js";
 import { NoodleMapWidget } from "../widgets/NoodleMapWidget.js";
 import { PowerWidget } from "../widgets/PowerWidget.js";
+import { SpeedGaugeWidget } from "../widgets/SpeedGaugeWidget.js";
 import { SpeedWidget } from "../widgets/SpeedWidget.js";
 import { TimeWidget } from "../widgets/TimeWidget.js";
 import type { FrameDataMeta } from "../Root.js";
@@ -40,6 +41,7 @@ const computeAvailableMetrics = (frames: FrameSnapshot[]): Set<string> => {
 // Map each widget type to the metric it requires. Unmapped types (time) always render.
 const REQUIRED_METRIC: Record<string, string> = {
   speed: "speedMps",
+  "speed-gauge": "speedMps",
   "heart-rate": "heartRateBpm",
   power: "powerW",
   cadence: "cadenceRpm",
@@ -85,6 +87,8 @@ const renderWidget = (
   switch (widget.type) {
     case "speed":
       return <SpeedWidget key={widget.id} {...baseProps} config={widget} />;
+    case "speed-gauge":
+      return <SpeedGaugeWidget key={widget.id} {...baseProps} config={widget} />;
     case "heart-rate":
       return <HeartRateWidget key={widget.id} {...baseProps} config={widget} />;
     case "power":

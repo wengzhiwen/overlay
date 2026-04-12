@@ -1,7 +1,7 @@
 import type { OverlayConfig } from "../config/schema.js";
 import type { Activity } from "../domain/activity.js";
 
-const movingAverage = (
+export const movingAverage = (
   values: Array<number | undefined>,
   windowSize: number,
   gapIndices: Set<number>,
