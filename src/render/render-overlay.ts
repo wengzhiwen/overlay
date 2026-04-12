@@ -9,7 +9,7 @@ import { renderFrames } from "@remotion/renderer";
 
 import { loadOverlayConfig } from "../config/load-config.js";
 import type { OverlayConfig } from "../config/schema.js";
-import { SNAPSHOT_INTERVAL_MS } from "../domain/frame-data.js";
+import { SNAPSHOT_INTERVAL_MS, type PositionHistoryPoint } from "../domain/frame-data.js";
 import type { FrameDataMeta } from "../remotion/Root.js";
 import { loadActivity } from "../parsers/activity-loader.js";
 import { buildFrameData } from "../preprocess/build-frame-data.js";
@@ -883,6 +883,7 @@ export const renderOverlay = async (
   const renderOutputs: Array<{ path: string; startedAt: string | undefined; durationSeconds: number }> = [];
   let cumulativeElapsedOffsetMs = 0;
   let cumulativeElevationHistory: ElevationHistoryPoint[] = [];
+  let cumulativePositionHistory: PositionHistoryPoint[] = [];
   let remainingRenderBudgetMs = request.maxDurationMs;
 
   for (let segmentIndex = 0; segmentIndex < activitySegments.length; segmentIndex++) {
@@ -960,6 +961,7 @@ export const renderOverlay = async (
           elapsedOffsetMs: cumulativeElapsedOffsetMs,
           maxDurationMs: remainingRenderBudgetMs,
           elevationHistory: cumulativeElevationHistory,
+          positionHistory: cumulativePositionHistory,
         });
         logger.info(
           `Built ${built.frames.length} 1Hz frame snapshot(s). Total render duration: ${(built.durationInFrames / built.fps).toFixed(1)}s.`,
@@ -1138,6 +1140,7 @@ export const renderOverlay = async (
       (frameData.durationInFrames / frameData.fps) * 1000,
     );
     cumulativeElevationHistory = frameData.elevationHistory;
+    cumulativePositionHistory = frameData.positionHistory;
     cumulativeElapsedOffsetMs += processedActivity.summary.durationMs ?? 0;
     if (segmentIndex < activitySegments.length - 1) {
       cumulativeElapsedOffsetMs += SNAPSHOT_INTERVAL_MS;

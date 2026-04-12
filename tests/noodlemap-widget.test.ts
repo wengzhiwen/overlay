@@ -50,21 +50,24 @@ describe("noodlemap widget", () => {
   });
 
   it("keeps the first point centered until the route needs to pan or scale", () => {
-    const frames = [
+    const positionHistory = [
       {
-        elapsedMs: 0,
-        position: { lat: 1.300000, lon: 103.800000 },
+        displayElapsedMs: 0,
+        lat: 1.300000,
+        lon: 103.800000,
       },
       {
-        elapsedMs: 5_000,
-        position: { lat: 1.300000, lon: 103.809000 },
+        displayElapsedMs: 5_000,
+        lat: 1.300000,
+        lon: 103.809000,
       },
       {
-        elapsedMs: 10_000,
-        position: { lat: 1.300000, lon: 103.818000 },
+        displayElapsedMs: 10_000,
+        lat: 1.300000,
+        lon: 103.818000,
       },
     ];
-    const projectedTrack = buildProjectedTrack(frames as never[], 10_000);
+    const projectedTrack = buildProjectedTrack(positionHistory, 10_000);
     const segments = buildNoodleMapSegments(projectedTrack, {
       width: 200,
       height: 120,
@@ -88,21 +91,24 @@ describe("noodlemap widget", () => {
   });
 
   it("breaks the route into new segments when the time gap exceeds 20 seconds", () => {
-    const frames = [
+    const positionHistory = [
       {
-        elapsedMs: 0,
-        position: { lat: 1.300000, lon: 103.800000 },
+        displayElapsedMs: 0,
+        lat: 1.300000,
+        lon: 103.800000,
       },
       {
-        elapsedMs: 5_000,
-        position: { lat: 1.301000, lon: 103.801000 },
+        displayElapsedMs: 5_000,
+        lat: 1.301000,
+        lon: 103.801000,
       },
       {
-        elapsedMs: 30_500,
-        position: { lat: 1.302000, lon: 103.802000 },
+        displayElapsedMs: 30_500,
+        lat: 1.302000,
+        lon: 103.802000,
       },
     ];
-    const projectedTrack = buildProjectedTrack(frames as never[], 30_500);
+    const projectedTrack = buildProjectedTrack(positionHistory, 30_500);
     const segments = buildNoodleMapSegments(projectedTrack, {
       width: 240,
       height: 140,

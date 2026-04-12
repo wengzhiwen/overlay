@@ -29,7 +29,7 @@ export const NoodleMapWidget = ({
     1,
     config.height - config.padding * 2 - labelHeight,
   );
-  const projectedTrack = buildProjectedTrack(frameData.frames, frame.elapsedMs);
+  const projectedTrack = buildProjectedTrack(frameData.positionHistory, frame.displayElapsedMs);
   const strokeWidth = getNoodleMapStrokeWidth(config.lineWeight, innerWidth);
   const mapCornerRadius = Math.max(8, config.borderRadius - config.padding / 2);
   const safePadding = getNoodleMapSafePadding(mapCornerRadius, strokeWidth, {

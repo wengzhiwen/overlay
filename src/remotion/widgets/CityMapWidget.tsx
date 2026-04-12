@@ -144,10 +144,10 @@ export const CityMapWidget = ({
       return release;
     }
 
-    const geojson = buildRouteGeoJSON(frameData.frames, frame.elapsedMs);
+    const geojson = buildRouteGeoJSON(frameData.positionHistory, frame.displayElapsedMs);
     source.setData(geojson as ReturnType<typeof buildRouteGeoJSON>);
 
-    const visible = buildVisibleCoordinates(frameData.frames, frame.elapsedMs);
+    const visible = buildVisibleCoordinates(frameData.positionHistory, frame.displayElapsedMs);
     const allCoords = visible.map((v) => v.lonLat);
     const bounds = computeBounds(allCoords);
 
@@ -165,7 +165,7 @@ export const CityMapWidget = ({
 
     // Cleanup: if this effect re-runs before idle fires, release the old handle.
     return release;
-  }, [frame.elapsedMs, mapReady, frameData.frames, lineWidth]);
+  }, [frame.displayElapsedMs, mapReady, frameData.positionHistory, lineWidth]);
 
   const isWithoutBgc = config.style === "without-bgc";
   const resolvedLabelColor = config.labelColor ?? theme.colors.secondary;

@@ -26,6 +26,12 @@ export type ElevationHistoryPoint = {
   distanceM: number | undefined;
 };
 
+export type PositionHistoryPoint = {
+  displayElapsedMs: number;
+  lat: number;
+  lon: number;
+};
+
 export type FrameData = {
   width: number;
   height: number;
@@ -37,6 +43,7 @@ export type FrameData = {
   powerZones: ActivityZone[];
   cadenceZones: ActivityZone[];
   elevationHistory: ElevationHistoryPoint[];
+  positionHistory: PositionHistoryPoint[];
   activityDurationMs: number;
   maxSpeed10sAvgMps: number | undefined;
 };

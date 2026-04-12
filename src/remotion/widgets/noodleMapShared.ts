@@ -1,4 +1,4 @@
-import type { FrameSnapshot } from "../../domain/frame-data.js";
+import type { FrameSnapshot, PositionHistoryPoint } from "../../domain/frame-data.js";
 
 export const NOODLEMAP_DEFAULT_RANGE_M = 2_000;
 export const NOODLEMAP_GAP_THRESHOLD_MS = 20_000;
@@ -176,31 +176,29 @@ export const getNoodleMapSafePadding = (
 };
 
 export const buildProjectedTrack = (
-  frames: FrameSnapshot[],
-  currentElapsedMs: number,
+  positionHistory: PositionHistoryPoint[],
+  currentDisplayElapsedMs: number,
 ): NoodleMapPoint[] => {
-  const visibleFrames = frames.filter(
-    (frame) =>
-      frame.elapsedMs <= currentElapsedMs &&
-      frame.position !== undefined,
+  const visible = positionHistory.filter(
+    (point) =>
+      point.displayElapsedMs <= currentDisplayElapsedMs,
   );
-  const firstFrame = visibleFrames[0];
+  const first = visible[0];
 
-  if (firstFrame?.position === undefined) {
+  if (first === undefined) {
     return [];
   }
 
-  const originLatRad = toRadians(firstFrame.position.lat);
-  const originLonRad = toRadians(firstFrame.position.lon);
+  const originLatRad = toRadians(first.lat);
+  const originLonRad = toRadians(first.lon);
 
-  return visibleFrames.map((frame) => {
-    const position = frame.position!;
-    const latRad = toRadians(position.lat);
-    const lonRad = toRadians(position.lon);
+  return visible.map((point) => {
+    const latRad = toRadians(point.lat);
+    const lonRad = toRadians(point.lon);
     const averageLat = (latRad + originLatRad) / 2;
 
     return {
-      elapsedMs: frame.elapsedMs,
+      elapsedMs: point.displayElapsedMs,
       xM: (lonRad - originLonRad) * EARTH_RADIUS_M * Math.cos(averageLat),
       yM: (latRad - originLatRad) * EARTH_RADIUS_M,
     };

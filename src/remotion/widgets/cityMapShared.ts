@@ -1,4 +1,4 @@
-import type { FrameSnapshot } from "../../domain/frame-data.js";
+import type { PositionHistoryPoint } from "../../domain/frame-data.js";
 import {
   type NoodleMapWeight,
   getNoodleMapStrokeWidth,
@@ -27,18 +27,18 @@ const EMPTY_GEOJSON: GeoJSONFeature = {
 };
 
 export const buildVisibleCoordinates = (
-  frames: FrameSnapshot[],
-  currentElapsedMs: number,
+  positionHistory: PositionHistoryPoint[],
+  currentDisplayElapsedMs: number,
 ): Array<{ elapsedMs: number; lonLat: GeoJSONPosition }> => {
   const result: Array<{ elapsedMs: number; lonLat: GeoJSONPosition }> = [];
 
-  for (const f of frames) {
-    if (f.elapsedMs > currentElapsedMs || f.position === undefined) {
+  for (const point of positionHistory) {
+    if (point.displayElapsedMs > currentDisplayElapsedMs) {
       continue;
     }
     result.push({
-      elapsedMs: f.elapsedMs,
-      lonLat: [f.position.lon, f.position.lat],
+      elapsedMs: point.displayElapsedMs,
+      lonLat: [point.lon, point.lat],
     });
   }
 
@@ -46,10 +46,10 @@ export const buildVisibleCoordinates = (
 };
 
 export const buildRouteGeoJSON = (
-  frames: FrameSnapshot[],
-  currentElapsedMs: number,
+  positionHistory: PositionHistoryPoint[],
+  currentDisplayElapsedMs: number,
 ): GeoJSONFeature => {
-  const visible = buildVisibleCoordinates(frames, currentElapsedMs);
+  const visible = buildVisibleCoordinates(positionHistory, currentDisplayElapsedMs);
 
   if (visible.length === 0) {
     return EMPTY_GEOJSON;

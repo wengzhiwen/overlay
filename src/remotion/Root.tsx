@@ -3,7 +3,7 @@ import { Composition, getInputProps } from "remotion";
 import { defaultOverlayConfig } from "../config/defaults.js";
 import type { OverlayConfig } from "../config/schema.js";
 import type { ActivityZone } from "../domain/activity.js";
-import { SNAPSHOT_INTERVAL_MS, type ElevationHistoryPoint } from "../domain/frame-data.js";
+import { SNAPSHOT_INTERVAL_MS, type ElevationHistoryPoint, type PositionHistoryPoint } from "../domain/frame-data.js";
 import { OverlayComposition } from "./compositions/OverlayComposition.js";
 
 export type FrameDataMeta = {
@@ -16,6 +16,7 @@ export type FrameDataMeta = {
   powerZones: ActivityZone[];
   cadenceZones: ActivityZone[];
   elevationHistory: ElevationHistoryPoint[];
+  positionHistory: PositionHistoryPoint[];
   activityDurationMs: number;
   maxSpeed10sAvgMps: number | undefined;
 };
@@ -35,6 +36,7 @@ const DEFAULT_FRAME_DATA_META: FrameDataMeta = {
   powerZones: [],
   cadenceZones: [],
   elevationHistory: [],
+  positionHistory: [],
   activityDurationMs: 0,
   maxSpeed10sAvgMps: undefined,
 };

@@ -5,6 +5,7 @@ import {
   type ElevationHistoryPoint,
   type FrameData,
   type FrameSnapshot,
+  type PositionHistoryPoint,
 } from "../domain/frame-data.js";
 import { movingAverage } from "./smooth.js";
 
@@ -83,6 +84,7 @@ export const buildFrameData = async (
     maxDurationMs?: number | undefined;
     elapsedOffsetMs?: number | undefined;
     elevationHistory?: ElevationHistoryPoint[] | undefined;
+    positionHistory?: PositionHistoryPoint[] | undefined;
   },
 ): Promise<FrameData> => {
   const baseDurationMs = getEffectiveDurationMs(activity, config);
@@ -155,6 +157,15 @@ export const buildFrameData = async (
       distanceM: f.metrics.distanceM,
     }));
 
+  // Build current segment's position history points for cross-segment map tracks.
+  const currentPositionHistory: PositionHistoryPoint[] = frames
+    .filter((f) => f.isActive && f.position !== undefined)
+    .map((f) => ({
+      displayElapsedMs: f.displayElapsedMs,
+      lat: f.position!.lat,
+      lon: f.position!.lon,
+    }));
+
   // Compute max 10-second rolling average speed for speed-gauge widget.
   const maxSpeed10sAvgMps = computeMaxSpeed10sAvg(activity.samples);
 
@@ -171,6 +182,10 @@ export const buildFrameData = async (
     elevationHistory: [
       ...(options?.elevationHistory ?? []),
       ...currentElevationHistory,
+    ],
+    positionHistory: [
+      ...(options?.positionHistory ?? []),
+      ...currentPositionHistory,
     ],
     activityDurationMs: activity.summary.durationMs ?? 0,
     maxSpeed10sAvgMps,
