@@ -91,8 +91,9 @@ describe("buildFrameData", () => {
     expect(frameData.frames).toHaveLength(2);
     expect(frameData.frames[1]?.metrics.distanceM).toBe(10);
     expect(frameData.frames[1]?.clockTimeIso).toBe("2026-03-25T09:16:46.000Z");
-    expect(frameData.elevationHistory).toHaveLength(2);
+    expect(frameData.elevationHistory).toHaveLength(3);
     expect(frameData.elevationHistory[1]?.altitudeM).toBe(12);
+    expect(frameData.elevationHistory[2]?.altitudeM).toBe(13);
     expect(getSnapshotForRenderFrame(frameData, 0)?.metrics.distanceM).toBe(0);
     expect(getSnapshotForRenderFrame(frameData, 1)?.metrics.distanceM).toBe(0);
     expect(getSnapshotForRenderFrame(frameData, 2)?.metrics.distanceM).toBe(10);

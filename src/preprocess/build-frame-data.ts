@@ -148,22 +148,23 @@ export const buildFrameData = async (
     },
   );
 
-  // Build current segment's elevation history points.
-  const currentElevationHistory: ElevationHistoryPoint[] = frames
-    .filter((f) => f.isActive)
-    .map((f) => ({
-      displayElapsedMs: f.displayElapsedMs,
-      altitudeM: f.metrics.altitudeM,
-      distanceM: f.metrics.distanceM,
+  // Build elevation and position history from the FULL activity samples
+  // (not from the composition-limited frames) so that fixed/trimmed duration
+  // strategies do not truncate the accumulated cross-segment history.
+  const currentElevationHistory: ElevationHistoryPoint[] = activity.samples
+    .filter((s) => !s.isDataGap)
+    .map((s) => ({
+      displayElapsedMs: s.elapsedMs + elapsedOffsetMs,
+      altitudeM: s.altitudeM,
+      distanceM: s.distanceM,
     }));
 
-  // Build current segment's position history points for cross-segment map tracks.
-  const currentPositionHistory: PositionHistoryPoint[] = frames
-    .filter((f) => f.isActive && f.position !== undefined)
-    .map((f) => ({
-      displayElapsedMs: f.displayElapsedMs,
-      lat: f.position!.lat,
-      lon: f.position!.lon,
+  const currentPositionHistory: PositionHistoryPoint[] = activity.samples
+    .filter((s) => !s.isDataGap && s.lat !== undefined && s.lon !== undefined)
+    .map((s) => ({
+      displayElapsedMs: s.elapsedMs + elapsedOffsetMs,
+      lat: s.lat!,
+      lon: s.lon!,
     }));
 
   // Compute max 10-second rolling average speed for speed-gauge widget.
